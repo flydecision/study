@@ -1,0 +1,5 @@
+*.sh
+*.php
+*.csv
+*.log
+.vscode/

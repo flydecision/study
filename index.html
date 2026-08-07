@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather model accuracy comparison against real station data</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    :root {
+        --bg-color: #f4f6f9;
+        --card-bg: #ffffff;
+        --text-main: #2c3e50;
+        --text-sub: #7f8c8d;
+        --primary: #3498db;
+        --success: #2ecc71;
+        --warning: #e67e22;
+        --danger: #e74c3c;
+        --border: #e2e8f0;
+        --gold: #f1c40f;
+        --silver: #b0b8bf;
+        --bronze: #cd7f32;
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        margin: 0;
+        padding: 20px;
+    }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    header {
+        display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+        margin-bottom: 25px; background: var(--card-bg); padding: 20px;
+        border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    h1 { margin: 0; font-size: 1.5rem; color: #1a252f; }
+    .subtitle { color: var(--text-sub); margin-top: 4px; }
+
+    .btn-reload {
+        background: var(--primary); color: white; border: none;
+        padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold;
+        transition: background 0.2s;
+    }
+    .btn-reload:hover { background: #2980b9; }
+
+    .notice { background: #fff8e1; border-left: 4px solid #f39c12; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+    .loading { text-align: center; font-size: 1.1rem; color: var(--text-sub); padding: 60px 20px; }
+
+    /* ---- Bloque Estado del Estudio ---- */
+    .study-summary-box {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-left: 5px solid var(--primary);
+        border-radius: 12px;
+        padding: 18px 22px;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .summary-text {
+        color: var(--text-main);
+        margin-bottom: 14px;
+        line-height: 1.45;
+    }
+    .summary-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        background: #f8fafc;
+        padding: 14px 18px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+    .summary-stat-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .summary-stat-label {
+        font-size: 0.75rem;
+        color: var(--text-sub);
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .summary-stat-val {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-top: 2px;
+    }
+
+    .section-card {
+        background: var(--card-bg); border-radius: 12px; padding: 20px;
+        margin-bottom: 25px; border: 1px solid var(--border);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+    h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 6px; }
+    .section-desc { color: var(--text-sub); margin-bottom: 15px; }
+
+    /* ---- Resumen / Ranking en Banner estilo Lista ---- */
+    .champion-banner {
+        background: linear-gradient(135deg, #2c3e50, #3d5a73);
+        color: #fff;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .champion-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+        padding-bottom: 8px;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .champion-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 10px 16px;
+        border-radius: 8px;
+        transition: background 0.2s;
+    }
+    .champion-row:hover {
+        background: rgba(255, 255, 255, 0.18);
+    }
+    .champion-pos {
+        font-weight: 800;
+        font-size: 1.1rem;
+        min-width: 80px;
+    }
+    .champion-model {
+        font-weight: 700;
+        font-size: 1.05rem;
+        flex-grow: 1;
+    }
+    .champion-score {
+        font-size: 0.9rem;
+        opacity: 0.95;
+        text-align: right;
+    }
+
+    .ranking-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 6px; }
+    .ranking-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .ranking-card h3 { margin: 0 0 12px 0; color: var(--text-main); border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+    .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+    .rank-pos { font-size: 1.1rem; margin-right: 8px; width: 33px; text-align: center; }
+    .rank-model { font-weight: 700; flex-grow: 1; font-size: 0.9rem; }
+    .rank-mae { font-weight: 700; }
+    .rank-bias { font-size: 1rem; color: var(--text-sub); }
+
+    /* Matriz Horizonte x Parámetro */
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+    th, td { padding: 10px 9px; border-bottom: 1px solid var(--border); }
+    th { background-color: #f8fafc; color: var(--text-sub); font-weight: 600; }
+    /* .matrix-table td { text-align: center; }  <-- Eliminada para alinear a la izquierda */
+    .matrix-table th:first-child, .matrix-table td:first-child { text-align: left; font-weight: 700; }
+
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; white-space: nowrap; }
+    .badge-arome { background: #e3f2fd; color: #1976d2; }
+    .badge-icon  { background: #f3e5f5; color: #7b1fa2; }
+    .badge-ecmwf { background: #e8f5e9; color: #388e3c; }
+    .badge-winner { background: #e8f8f0; color: #27ae60; }
+    .badge-loser  { background: #fdedec; color: #c0392b; }
+    .badge-muted  { background: #f1f2f3; color: #95a5a6; }
+    .badge-best-param { background: #d4edda; color: #155724; font-size: 0.75rem; margin-left: 4px; padding: 2px 5px; border-radius: 4px; font-weight: bold; }
+
+    /* Filtros */
+    .filters { display: flex; gap: 20px; margin-bottom: 6px; flex-wrap: wrap; align-items: flex-end; }
+    .filters label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-sub); margin-bottom: 5px; }
+    .filters select { padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); min-width: 220px; font-size: 0.9rem; background: #fff; }
+
+    .chart-container { margin-top: 22px; }
+    .chart-container canvas { max-height: 320px; }
+
+    code { background: #f1f2f3; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+
+    @media (max-width: 768px) {
+        table { display: block; overflow-x: auto; white-space: nowrap; }
+        .champion-score { text-align: left; }
+    }
+    @media (max-width: 350px) {
+        .champion-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- CABECERA SUPERIOR CON LOGOS Y ENLACES -->
+    <header style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; background: var(--card-bg); padding: 15px 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 25px;">
+        <div>
+            <!-- Lado Izquierdo: Logo + Texto con Subtítulo -->
+            <a href="https://flydecision.com" target="_blank" style="display: flex; align-items: center; gap: 15px; text-decoration: none; color: var(--text-main);">
+                <img src="https://flydecision.com/icons/logo_192px.png" alt="FlyDecision Logo" style="height: 37px; width: auto;">
+                <div style="display: flex; flex-direction: column; line-height: 1.1;">
+                    <span style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px;">FlyDecision.com</span>
+                    <span style="font-size: 0.74rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px;"><b>></b>&thinsp;Weather Study</span>
+                </div>
+            </a>
+        </div>
+        <!-- Lado Derecho: Badges de descarga/código -->
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="https://play.google.com/store/apps/details?id=com.flydecision" target="_blank" title="Download on Google Play">
+                <img src="https://flydecision.com/icons/GetItOnGooglePlay_Badge_Web_color_Spanish.png" alt="Download on Google Play" style="height: 37px; width: auto;">
+            </a>
+            <a href="https://github.com/flydecision/flydecision" target="_blank" title="View code on GitHub">
+                <img src="https://flydecision.com/icons/github.webp" alt="GitHub" style="height: 37px; width: auto;">
+            </a>
+        </div>
+    </header>
+
+    <header>
+        <div>
+            <h1>📊 Weather model accuracy comparison against real station data</h1>
+            <div class="subtitle">
+
+                Continuous 24/7 automated analysis comparing weather model forecasts with real wind measurements from weather stations located at paragliding takeoffs. The ultimate goal is to discover which model performs best: overall, or specifically by parameters, locations, times, or forecast horizons.
+                <ul>
+                    <li><strong>3 Models:</strong> AromeHD 1.3km / ICON-EU 7km / ECMWF IFS 9km</li>
+                    <li><strong>13 Weather Stations:</strong> Located at paragliding takeoffs</li>
+                    <li><strong>3 Parameters:</strong> Average wind speed, maximum gust, and direction</li>
+                    <li><strong>6 Time Slots:</strong> Real data and forecast snapshots at 9, 11, 13, 15, 17, and 19h daily (local time CET/CEST <i>Europe/Madrid</i>)</li>
+                    <li><strong>4 Forecast Horizons:</strong> +6h / +24h / +48h / +72h</li>
+                </ul>
+                <a href="https://docs.google.com/spreadsheets/d/1q4gKHEBlgoGtcxPWoi5eiqz-Fm2nykaa0Z5JbAgsi18" target="_blank" rel="noopener noreferrer">Source data</a>
+                <span> (automatically updated spreadsheet. You can view or download it to verify data or perform your own analysis)</span>
+            </div>
+        </div>
+    </header>
+
+    <div id="loading" class="loading">Loading and matching estudio.csv…</div>
+    <div id="aviso-espera" class="notice" style="display:none;">
+        ⏳ <b>Accumulating data:</b> there are not enough validated matches (real vs. forecast) yet to display the study. Please check back when 24-72h have passed since the first data captures.
+    </div>
+
+    <div id="dashboard" style="display:none;">
+
+        <!-- ============ RESUMEN / ESTADO DEL ESTUDIO ============ -->
+        <div class="study-summary-box">
+            <div class="summary-text">
+                🟢 <b>Study status:</b> The displayed data represents accumulated results to date. The study is in continuous evolution and the page updates automatically with each new data capture.
+            </div>
+            <div class="summary-stats-grid">
+                <div class="summary-stat-item">
+                    <span class="summary-stat-label">Start Date</span>
+                    <span class="summary-stat-val" id="stat-fecha-inicio">-</span>
+                </div>
+                <div class="summary-stat-item">
+                    <span class="summary-stat-label">Elapsed Time</span>
+                    <span class="summary-stat-val" id="stat-dias-transcurridos">-</span>
+                </div>
+                <div class="summary-stat-item">
+                    <span class="summary-stat-label">Total Samples</span>
+                    <span class="summary-stat-val" id="stat-cruces-totales">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ RESUMEN / RANKING GENERAL ============ -->
+        <div class="section-card">
+            <h2>🏆 Overall Ranking:</h2>
+
+            <div class="section-desc">
+            </div>
+
+            <div id="champion-banner" class="champion-banner"  style="max-width: 420px;"></div>
+
+            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
+                <strong>ℹ️ How is the Champion Score calculated:</strong>
+                <p>The score represents the model's <b>average ranking position</b> across all parameters (wind, gust, direction) and forecast horizons (+6h, +24h, +48h, +72h).</p>
+                <p>For every valid comparison, models are ranked by their absolute error (MAE):</p>
+                <ul style="margin-top: 6px; margin-bottom: 6px;">
+                    <li><b>1st place (best)</b> = 1 point</li>
+                    <li><b>2nd place</b> = 2 points</li>
+                    <li><b>3rd place (worst)</b> = 3 points</li>
+                </ul>
+                <p>A lower score is better (a perfect score of <b>1.00</b> means the model won every single comparison). The number in parentheses <b>(matches)</b> indicates how many valid comparisons were made to calculate this average. ECMWF is fairly excluded from gust comparisons.</p>
+                <p>This overall ranking already takes into account that AromeHD does not compete in +48h and +72h horizons.</p>
+            </div>
+        </div>
+
+        <!-- ============ RANKING POR PARÁMETRO ============ -->
+        <div class="section-card">
+            <h2>🏆 Parameter Ranking for +24h Forecast Horizon:</h2>
+            <div class="section-desc">
+                Averages the absolute error (MAE) for average wind and gust, as well as accumulated bias at 24 hours out (ECMWF does not compete in gust as it does not record that parameter). For direction, it averages the absolute angular error (0° to 180°) and displays in parentheses the signed directional bias (+ / - depending on clockwise or counter-clockwise rotation relative to real wind).<br><br>
+            </div>
+
+            <div class="ranking-grid">
+                <div class="ranking-card"><h3>Average Wind</h3><div id="rank-viento"></div></div>
+                <div class="ranking-card"><h3>Gust</h3><div id="rank-racha"></div></div>
+                <div class="ranking-card"><h3>Direction</h3><div id="rank-dir"></div></div>
+            </div>
+
+            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
+                <b>ℹ️ Quick Glossary:</b>
+                <p style="margin: 8px 0 4px;">
+                    • <b>Mean Absolute Error (MAE):</b> The "magnitude of the error", regardless of whether it is an overestimation or underestimation.
+                </p>
+                <p style="margin: 0 0 8px;">
+                    • <b>Bias:</b> Indicates whether the model tends to predict more or less wind than actual (e.g., -4 km/h means it tends to underestimate, so actual wind will likely be higher).
+                </p>
+                <p style="margin: 0;">
+                    For all statistical calculations on the <i>Direction</i> parameter, a minimum speed threshold of 8 km/h has been established (slightly higher than the ICAO/METAR standard of 3 knots / 5.5 km/h). The goal is to minimize what is called in meteorological statistics "the noise of calms" (large random direction fluctuations in light winds).
+                </p>
+                <p style="margin: 0;">
+                    AromeHD does not compete in +48h and +72h horizons.
+                </p>
+            </div>
+
+        </div>
+
+        <!-- ============ GANADOR POR HORIZONTE Y POR PARÁMETRO ============ -->
+        <div class="section-card">
+            <h2>🏆 Winner by Horizon and Parameter (Summary):</h2>
+            <div class="section-desc">Cross-table of forecast horizons (+6h, +24h, +48h, +72h) with analyzed parameters (average wind, gust, and direction). Shows the winning model label in each specific cell alongside its Mean Absolute Error (MAE).</div>
+
+            <table class="matrix-table">
+                <thead><tr><th>Horizon</th><th>Average Wind</th><th>Gust</th><th>Direction</th></tr></thead>
+                <tbody id="matriz-body"></tbody>
+            </table>
+            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
+                ℹ️ AromeHD does not compete in +48h and +72h horizons. n = Current number of samples.
+            </div>
+        </div>
+
+        <!-- ============ TABLA POR HORIZONTE ============ -->
+        <div class="section-card">
+            <h2>🏆 Winner by Horizon and Parameter (Detailed):</h2>
+            <div class="section-desc">Cross-table of forecast horizons (+6h, +24h, +48h, +72h) with analyzed parameters (average wind, gust, and direction) and models. Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and bias.</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Horizon</th><th>Model</th>
+                        <th>Average Wind</th>
+                        <th>Gust</th>
+                        <th>Direction</th>
+                        <th>Global Score</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-horizontes"><tr><td colspan="6" style="text-align:center;">Loading…</td></tr></tbody>
+            </table>
+            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
+                    ℹ️ Global Score (0-10) is calculated weighted: Penalty = (Avg MAE × 0.4) + (Gust MAE × 0.3) + (Dir Error × 0.08 × 0.3). Score = max(0, 10 - Penalty / 1.5).
+                <p style="margin: 8px 0 0;">
+                    AromeHD does not compete in +48h and +72h horizons.
+                </p>
+            </div>
+        </div>
+
+        <!-- ============ FILTROS + GRÁFICAS + DETALLE ============ -->
+        <div class="section-card">
+            <h2>🔍 Explore by Takeoff, Horizon, and Data Time</h2>
+            <div class="section-desc">Filter to see bias by location and error evolution day by day. Note: naturally, the +6h horizon only has comparative data for the 9, 11, and 13h data captures.</div>
+
+            <div class="filters">
+                <div>
+                    <label for="lugarSelect">Takeoff</label>
+                    <select id="lugarSelect" onchange="actualizarVistaDetalle()"><option value="todos">All Takeoffs</option></select>
+                </div>
+                <div>
+                    <label for="horizonteSelect">Horizon</label>
+                    <select id="horizonteSelect" onchange="actualizarVistaDetalle()">
+                        <option value="all">All Horizons</option>
+                        <option value="6">+6 hours</option>
+                        <option value="24">+24 hours</option>
+                        <option value="48">+48 hours</option>
+                        <option value="72">+72 hours</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="horaSelect">Data time</label>
+                    <select id="horaSelect" onchange="actualizarVistaDetalle()">
+                        <option value="todas">All times</option>
+                        <option value="9">09:00 h</option>
+                        <option value="11">11:00 h</option>
+                        <option value="13">13:00 h</option>
+                        <option value="15">15:00 h</option>
+                        <option value="17">17:00 h</option>
+                        <option value="19">19:00 h</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="background: #f0f8ff; border: 1px solid #bcdff1; padding: 15px; border-radius: 8px; margin-top: 20px; margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px;">🧮 Systematic Bias Correction & Calibration for Average Wind using Ordinary Least Squares (OLS) Linear Regression</h3>
+                <div id="formula-correccion" style="font-family: monospace; font-size: 1.1rem; font-weight: bold; color: #2c3e50;">
+                    Select a specific takeoff and time to calculate the formula...
+                </div>
+                <div id="formula-detalle" style="color: #7f8c8d; margin-top: 5px;"></div>
+            </div>
+
+            <div class="chart-container"><h3>Average wind bias by takeoff</h3><canvas id="biasChart"></canvas></div>
+            <div class="chart-container"><h3>Gust bias by takeoff</h3><canvas id="biasRachaChart"></canvas></div>
+            <div class="chart-container"><h3>Average wind error evolution (by day)</h3><canvas id="historyChart"></canvas></div>
+            <div class="chart-container"><h3>Maximum gust error evolution (by day)</h3><canvas id="historyRachaChart"></canvas></div>
+            <div class="chart-container"><h3>Direction error evolution (by day)</h3><canvas id="historyDirChart"></canvas></div>
+
+            <h3 style="margin-top:26px; font-size:1.2rem;">📍 Takeoff / Weather Station Details</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Takeoff</th>
+                        <th>Station</th>
+                        <th>Samples</th>
+                        <th>AromeHD (Avg / Gust / Dir)</th>
+                        <th>ICON-EU (Avg / Gust / Dir)</th>
+                        <th>ECMWF (Avg / Dir)</th>
+                        <th>Overall Winner</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-despegues"><tr><td colspan="7" style="text-align:center;">-</td></tr></tbody>
+            </table>
+            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
+                <strong>ℹ️ How is the Overall Winner calculated?</strong><br>
+                A <b>score from 0 to 10</b> is assigned to each model at each takeoff (10 would be a perfect forecast). The score is calculated by deducting points based on error across the 3 parameters:
+                <ul style="margin-top: 6px; margin-bottom: 0;">
+                    <li><b>40% of score:</b> Average wind speed error.</li>
+                    <li><b>30% of score:</b> Maximum gust error.</li>
+                    <li><b>30% of score:</b> Wind direction error.</li>
+                </ul>
+                <p style="margin: 8px 0 0;">
+                    Since maximum gust data is not collected for ECMWF, its score is reweighted to 55% average wind and 45% direction so it is not penalized for lacking gust data.
+                </p>
+                 
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', cargarEstudio);
+
+let CRUCES = { '6': [], '24': [], '48': [], '72': [] };
+let LINKS_DESPEGUES = {}; 
+let charts = { bias: null, biasRacha: null, history: null, historyRacha: null, historyDir: null };
+
+const coloresModelo = {
+    AromeHD: 'rgba(52, 152, 219, 0.75)',
+    'ICON-EU': 'rgba(155, 89, 182, 0.75)',
+    ECMWF: 'rgba(46, 204, 113, 0.75)'
+};
+const badgeClase = { AromeHD: 'badge-arome', 'ICON-EU': 'badge-icon', ECMWF: 'badge-ecmwf' };
+
+/* ---------------------------------------------------------------------
+ * CARGA Y PARSEO
+ * ------------------------------------------------------------------- */
+async function cargarEstudio() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('aviso-espera').style.display = 'none';
+    try {
+        // 1. Cargamos el archivo principal (OBLIGATORIO)
+        const response = await fetch('estudio.csv?t=' + Date.now());
+        if (!response.ok) throw new Error('Could not load estudio.csv');
+        const csvText = await response.text();
+        const rows = parseCSV(csvText);
+
+        // 2. Intentamos cargar el archivo de links (OPCIONAL)
+        try {
+            const resMapa = await fetch('estudio_pares_despegues_balizas.csv?t=' + Date.now());
+            if (resMapa.ok) {
+                const mapText = await resMapa.text();
+                LINKS_DESPEGUES = parseMapCSV(mapText);
+            }
+        } catch (e) {
+            console.warn('Could not load mapping CSV, takeoff names will not have links.');
+        }
+
+        // 3. PROCESAMOS LOS DATOS
+        procesarDatos(rows);
+
+        // 4. Comprobamos si hay datos suficientes
+        const c24 = CRUCES['24'], c48 = CRUCES['48'], c72 = CRUCES['72'];
+        if (c24.length === 0 && c48.length === 0 && c72.length === 0) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('aviso-espera').style.display = 'block';
+            return;
+        }
+
+        // Poblar selector de lugares
+        const lugarSelect = document.getElementById('lugarSelect');
+        lugarSelect.innerHTML = '<option value="todos">All Takeoffs</option>';
+        const lugares = [...new Set(rows.map(r => r.despegue).filter(Boolean))].sort();
+        lugares.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l; opt.text = l;
+            lugarSelect.add(opt);
+        });
+
+        renderEstadoEstudio(rows);
+        renderResumenGlobal();
+        renderTablaHorizontes();
+        actualizarVistaDetalle();
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+    } catch (err) {
+        console.error(err);
+        document.getElementById('loading').innerHTML =
+            `<span style="color:#c0392b;">Error loading estudio.csv: ${err.message}</span>`;
+    }
+}
+
+// Parser de CSV con ; que respeta comillas (campos con ; o saltos de línea embebidos)
+function parseCSVLine(line, delim) {
+    const values = [];
+    let cur = '', inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (inQuotes) {
+            if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; } }
+            else cur += c;
+        } else {
+            if (c === '"') inQuotes = true;
+            else if (c === delim) { values.push(cur); cur = ''; }
+            else cur += c;
+        }
+    }
+    values.push(cur);
+    return values.map(v => v.trim());
+}
+
+function parseCSV(text) {
+    const raw = text.replace(/^\uFEFF/, '');
+    const rawLines = raw.split(/\r?\n/);
+    const logicalLines = [];
+    let buffer = null;
+    rawLines.forEach(l => {
+        buffer = buffer === null ? l : buffer + '\n' + l;
+        if (((buffer.match(/"/g) || []).length) % 2 === 0) {
+            if (buffer.trim() !== '') logicalLines.push(buffer);
+            buffer = null;
+        }
+    });
+    if (buffer !== null && buffer.trim() !== '') logicalLines.push(buffer);
+    if (logicalLines.length === 0) return [];
+
+    const headers = parseCSVLine(logicalLines[0], ';');
+    const rows = [];
+    for (let i = 1; i < logicalLines.length; i++) {
+        const values = parseCSVLine(logicalLines[i], ';');
+        if (values.length === headers.length) {
+            const obj = {};
+            headers.forEach((h, idx) => { obj[h] = values[idx]; });
+            rows.push(obj);
+        }
+    }
+    return rows;
+}
+
+// Función específica para leer el archivo de configuración y extraer los links
+function parseMapCSV(text) {
+    const raw = text.replace(/^\uFEFF/, '');
+    const lines = raw.split(/\r?\n/);
+    const map = {};
+    if (lines.length < 2) return map;
+    
+    const headers = parseCSVLine(lines[0], ';');
+    
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const values = parseCSVLine(lines[i], ';');
+        if (values.length === headers.length) {
+            const row = {};
+            headers.forEach((h, idx) => { row[h.trim()] = values[idx].trim(); });
+            if (row.id_despegue) {
+                map[row.id_despegue] = row.link || '#';
+            }
+        }
+    }
+    return map;
+}
+
+// Normaliza cualquier fecha a clave YYYY-MM-DD-HH, redondeando al tramo horario más cercano
+function parseDateToKey(dateStr) {
+    if (!dateStr) return null;
+    dateStr = dateStr.trim();
+    let yyyy, mm, dd, hh = 0, min = 0;
+    if (dateStr.includes('/')) {
+        const parts = dateStr.split(' ');
+        if (parts.length < 2) return null;
+        const dParts = parts[0].split('/'); const tParts = parts[1].split(':');
+        dd = parseInt(dParts[0], 10); mm = parseInt(dParts[1], 10); yyyy = parseInt(dParts[2], 10);
+        hh = parseInt(tParts[0], 10); min = parseInt(tParts[1], 10);
+    } else {
+        const cleanStr = dateStr.replace('T', ' ');
+        const parts = cleanStr.split(' ');
+        const dParts = parts[0].split('-');
+        const tParts = parts[1] ? parts[1].split(':') : [0, 0];
+        yyyy = parseInt(dParts[0], 10); mm = parseInt(dParts[1], 10); dd = parseInt(dParts[2], 10);
+        hh = parseInt(tParts[0], 10); min = parseInt(tParts[1], 10);
+    }
+    if (isNaN(yyyy) || isNaN(mm) || isNaN(dd)) return null;
+    if (min >= 30) {
+        hh += 1;
+        if (hh >= 24) {
+            const d = new Date(yyyy, mm - 1, dd, hh, 0);
+            yyyy = d.getFullYear(); mm = d.getMonth() + 1; dd = d.getDate(); hh = d.getHours();
+        }
+    }
+    return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}-${String(hh).padStart(2, '0')}`;
+}
+
+// Diferencia angular absoluta (0° a 180°)
+function angularDiff(a, b) {
+    if (a === null || b === null || isNaN(a) || isNaN(b)) return null;
+    let diff = Math.abs(a - b) % 360;
+    return diff > 180 ? 360 - diff : diff;
+}
+
+// Diferencia angular con signo (-180° a +180°) para Sesgo
+function signedAngularDiff(pred, real) {
+    if (pred === null || real === null || isNaN(pred) || isNaN(real)) return null;
+    return ((pred - real + 540) % 360) - 180;
+}
+
+// Cálculo de Puntuación Global (0 a 10 puntos)
+// Pesos: Viento Medio (40%), Racha (30%), Dirección (30%)
+function calcularNotaGlobal(maeMedia, maeRacha, errDir) {
+    if (maeMedia === null || isNaN(maeMedia)) return null;
+    
+    let penMedia = maeMedia * 1.0; 
+    let penDir   = (errDir !== null && !isNaN(errDir)) ? errDir * 0.08 : 2.0;
+
+    let penalizacionTotal = 0;
+
+    // Si el modelo TIENE racha (AromeHD, ICON-EU)
+    if (maeRacha !== null && !isNaN(maeRacha)) {
+        let penRacha = maeRacha * 0.5;
+        // Pesos: Viento Medio (40%), Racha (30%), Dirección (30%)
+        penalizacionTotal = (penMedia * 0.4) + (penRacha * 0.3) + (penDir * 0.3);
+    } else {
+        // Si el modelo NO TIENE racha (ECMWF)
+        // Se reparte el peso solo entre los parámetros que SÍ compite: Media (55%), Dirección (45%)
+        penalizacionTotal = (penMedia * 0.55) + (penDir * 0.45);
+    }
+
+    let nota = Math.max(0, 10 - (penalizacionTotal / 1.5));
+    return nota;
+}
+
+/* ---------------------------------------------------------------------
+ * CRUCE DE DATOS
+ * ------------------------------------------------------------------- */
+// Helper para convertir string a Date
+function parseToDate(dateStr) {
+    if (!dateStr) return null;
+    let cleanStr = dateStr.trim().replace(' ', 'T');
+    let parts = cleanStr.split('T');
+    if (parts[1] && parts[1].length === 4) parts[1] = '0' + parts[1];
+    cleanStr = parts.join('T');
+    const d = new Date(cleanStr);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+// Genera la URL oficial de la baliza según su red y su ID
+function getBalizaUrl(red, id) {
+    if (!id) return '#';
+    switch (red) {
+        case 'euskalmet':
+            return 'https://www.euskalmet.euskadi.eus/observacion/datos-de-estaciones/#';
+        case 'meteonavarra': {
+            const idLimpio = id.replace(/\D/g, '');
+            const hoy = new Date();
+            const manana = new Date(hoy);
+            manana.setDate(manana.getDate() + 1);
+            const formateaFecha = (d) => {
+                const dia = String(d.getDate()).padStart(2, '0');
+                const mes = String(d.getMonth() + 1).padStart(2, '0');
+                const anio = d.getFullYear();
+                return `${dia}/${mes}/${anio}`;
+            };
+            const fechaDesde = formateaFecha(hoy);
+            const fechaHasta = formateaFecha(manana);
+            return `https://meteo.navarra.es/estaciones/estacion_datos_m.cfm?idestacion=${idLimpio}&fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&p_10=1&p_10=2&p_10=3&p_10=4&p_10=11&p_10=6&p_10=7`;
+        }
+        case 'meteocat':
+            return `https://www.meteo.cat/observacions/xema/dades?codi=${id}`;
+        case 'meteogalicia':
+            return `https://www.meteogalicia.gal/web/observacion/rede-meteoroloxica?idEstacion=${id}`;
+        case 'aemet':
+            return `https://www.aemet.es/es/eltiempo/observacion/ultimosdatos?k=arn&l=${id}&w=0&datos=img&x=h24&f=vel_viento`;
+        case 'meteoclimatic':
+            return `https://www.meteoclimatic.net/perfil/${id}`;
+        case 'holfuy': {
+            const idLimpio = id.toLowerCase().startsWith('s') ? id.substring(1) : id;
+            return `https://holfuy.com/en/weather/${idLimpio}`;
+        }
+        case 'pioupiou':
+            return `https://www.openwindmap.org/windbird-${id}`;
+        case 'meteofrance':
+            return '#';
+        default:
+            return '#';
+    }
+}
+
+function procesarDatos(rows) {
+    // 1. Guardamos todas las realidades en una lista por despegue
+    const realList = {};
+    rows.forEach(r => {
+        const realDate = parseToDate(r.real_momento);
+        const vientoReal = parseFloat(r.real_media);
+        if (realDate && !isNaN(vientoReal)) {
+            if (!realList[r.id_despegue]) realList[r.id_despegue] = [];
+            realList[r.id_despegue].push({
+                date: realDate,
+                viento: vientoReal,
+                racha: parseFloat(r.real_racha),
+                dir: parseFloat(r.real_direccion)
+            });
+        }
+    });
+
+    CRUCES = { '6': [], '24': [], '48': [], '72': [] };
+
+    // 2. Cruzamos los pronósticos buscando la realidad MÁS CERCANA en tiempo
+    rows.forEach(r => {
+        const idDespegue = r.id_despegue;
+        const lugar = r.despegue || idDespegue;
+        const baliza = r.id_baliza || '';
+        const red = (r.archivo_datos_balizas || '').replace('balizas_', '').replace('_6h.json', '').replace('_cache.json', '');
+        const fechaDia = (r.momento_captura || '').substring(0, 10);
+
+        ['6', '24', '48', '72'].forEach(h => {
+            const forecastDate = parseToDate(r[`${h}h_pronostico_momento`]);
+            if (!forecastDate) return;
+
+            const reals = realList[idDespegue];
+            if (!reals || reals.length === 0) return;
+
+            // Buscar la realidad más cercana a la fecha del pronóstico
+            let closestReal = null;
+            let minDiff = Infinity;
+            reals.forEach(realObj => {
+                const diff = Math.abs(forecastDate.getTime() - realObj.date.getTime());
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestReal = realObj;
+                }
+            });
+
+            // Tolerancia de 90 minutos sería 5400000 (5.400.000 ms) y entraría Áger pero es demasiado, así que voy a poner 20 min
+            // Si la realidad más cercana está a más de 20 min del pronóstico, la descartamos.
+            if (!closestReal || minDiff > 1200000 || isNaN(closestReal.viento)) return;
+
+            const real = closestReal;
+
+            const modelos = {
+                AromeHD: {
+                    media: parseFloat(r[`${h}h_arome_media`]),
+                    racha: parseFloat(r[`${h}h_arome_racha`]),
+                    dir: parseFloat(r[`${h}h_arome_direccion`])
+                },
+                'ICON-EU': {
+                    media: parseFloat(r[`${h}h_icon_media`]),
+                    racha: parseFloat(r[`${h}h_icon_racha`]),
+                    dir: parseFloat(r[`${h}h_icon_direccion`])
+                },
+                ECMWF: {
+                    media: parseFloat(r[`${h}h_ecmwf_media`]),
+                    racha: NaN, // ECMWF no da racha
+                    dir: parseFloat(r[`${h}h_ecmwf_direccion`])
+                }
+            };
+
+            // Extraemos la hora del PRONÓSTICO (que siempre es en punto: 10:00, 09:00, etc.)
+            let horaToma = null;
+            const refHoraStr = r['24h_pronostico_momento'] || r.momento_captura;
+            if (refHoraStr) {
+                let h = parseInt(refHoraStr.substring(11, 13), 10);
+                if (!isNaN(h)) {
+                    if (h % 2 === 0 && h !== 0) h -= 1; // Convierte 10->9, 12->11, 14->13...
+                    horaToma = h;
+                }
+            }
+            const item = { idDespegue, lugar, baliza, red, fecha: fechaDia, hora: horaToma, real, modelos: {} };
+
+            Object.keys(modelos).forEach(m => {
+                const v = modelos[m];
+                // Definimos un umbral de calma. Si el viento real es menor a esto, la dirección no cuenta. En estadística meteorológica, a esto se le llama "El ruido de la calma".
+                const UMBRAL_CALMA = 8; // km/h
+                const dirValida = !isNaN(v.dir) && !isNaN(real.dir) && real.viento >= UMBRAL_CALMA;
+
+                item.modelos[m] = {
+                    // Guardamos el valor del pronóstico original para poder usarlo en la regresión OLS
+                    mediaPred: !isNaN(v.media) ? v.media : null,
+                    rachaPred: !isNaN(v.racha) ? v.racha : null,
+                    dirPred: !isNaN(v.dir) ? v.dir : null,
+                    // Cálculos de error y sesgo
+                    mediaErr: !isNaN(v.media) ? Math.abs(v.media - real.viento) : null,
+                    mediaBias: !isNaN(v.media) ? (v.media - real.viento) : null,
+                    rachaErr: !isNaN(v.racha) && !isNaN(real.racha) ? Math.abs(v.racha - real.racha) : null,
+                    rachaBias: !isNaN(v.racha) && !isNaN(real.racha) ? (v.racha - real.racha) : null,
+                    dirErr: dirValida ? angularDiff(v.dir, real.dir) : null,
+                    dirBias: dirValida ? signedAngularDiff(v.dir, real.dir) : null
+                };
+            });
+            CRUCES[h].push(item);
+        });
+    });
+}
+
+/* ---------------------------------------------------------------------
+ * UTILIDADES DE AGREGACIÓN
+ * ------------------------------------------------------------------- */
+const MODELOS = ['AromeHD', 'ICON-EU', 'ECMWF'];
+const PARAMS = { viento: 'mediaErr', racha: 'rachaErr', dir: 'dirErr' };
+const PARAMS_BIAS = { viento: 'mediaBias', racha: 'rachaBias', dir: 'dirBias' };
+
+function media(arr) {
+    const v = arr.filter(x => x !== null && !isNaN(x));
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+
+// Calcula la regresión lineal (y = mx + b) para un modelo y parámetro
+function calcRegresion(list, modelo, paramKey) {
+    const predKey = paramKey === 'viento' ? 'mediaPred' : (paramKey === 'racha' ? 'rachaPred' : 'dirPred');
+    const realKey = paramKey === 'viento' ? 'viento' : (paramKey === 'racha' ? 'racha' : 'dir');
+    
+    const puntos = list.map(it => {
+        let pred;
+        if (paramKey === 'viento') pred = it.modelos[modelo].mediaPred;
+        else if (paramKey === 'racha') pred = it.modelos[modelo].rachaPred;
+        else pred = it.modelos[modelo].dirPred;
+        
+        const real = it.real[realKey];
+        return { x: pred, y: real };
+    }).filter(p => p.x !== null && !isNaN(p.x) && p.y !== null && !isNaN(p.y));
+
+    if (puntos.length < 5) return { m: 1, b: 0, r2: 0, n: puntos.length };// Necesitamos al menos 5 muestras
+
+    const n = puntos.length;
+    const sumX = puntos.reduce((s, p) => s + p.x, 0);
+    const sumY = puntos.reduce((s, p) => s + p.y, 0);
+    const sumXY = puntos.reduce((s, p) => s + p.x * p.y, 0);
+    const sumX2 = puntos.reduce((s, p) => s + p.x * p.x, 0);
+    const sumY2 = puntos.reduce((s, p) => s + p.y * p.y, 0);
+
+    const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const b = (sumY - m * sumX) / n;
+    
+    // Cálculo de R^2 (precisión de la fórmula)
+    const numerador = Math.pow((n * sumXY - sumX * sumY), 2);
+    const denominador = (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY);
+    const r2 = denominador !== 0 ? numerador / denominador : 0;
+
+    return { m: m, b: b, r2: r2, n: n };
+}
+
+function statsModelo(list, modelo, paramKey) {
+    const errKey = PARAMS[paramKey], biasKey = PARAMS_BIAS[paramKey];
+    const errs = list.map(it => it.modelos[modelo][errKey]);
+    const biases = list.map(it => it.modelos[modelo][biasKey]);
+    return { mae: media(errs), bias: media(biases), n: errs.filter(v => v !== null && !isNaN(v)).length };
+}
+
+function fmtDir(mae, bias) {
+    if (mae === null) return '-';
+    const b = bias !== null ? `${bias > 0 ? '+' : ''}${Math.round(bias)}°` : '-';
+    return `${Math.round(mae)}° <small>(${b})</small>`;
+}
+function fmtNum(mae, bias, unidad = '') {
+    if (mae === null) return '-';
+    const b = bias !== null ? `${bias > 0 ? '+' : ''}${bias.toFixed(1)}` : '-';
+    return `${mae.toFixed(1)}${unidad} <small>(${b})</small>`;
+}
+
+/* ---------------------------------------------------------------------
+ * 0) BLOQUE RESUMEN / ESTADO DEL ESTUDIO
+ * ------------------------------------------------------------------- */
+function renderEstadoEstudio(rows) {
+    if (!rows || rows.length === 0) return;
+
+    const totalCruces = CRUCES['6'].length + CRUCES['24'].length + CRUCES['48'].length + CRUCES['72'].length;
+
+    const capturas = rows.map(r => r.momento_captura).filter(Boolean).sort();
+    if (capturas.length === 0) return;
+
+    const fechaInicioStr = capturas[0];
+    const fechaFinStr = capturas[capturas.length - 1];
+
+    const startDate = new Date(fechaInicioStr.replace(' ', 'T'));
+    const endDate   = new Date(fechaFinStr.replace(' ', 'T'));
+
+    const dd = String(startDate.getDate()).padStart(2, '0');
+    const mm = String(startDate.getMonth() + 1).padStart(2, '0');
+    const yyyy = startDate.getFullYear();
+    const fechaInicioFmt = `${dd}/${mm}/${yyyy}`;
+
+    const diffMs = Math.max(0, endDate.getTime() - startDate.getTime());
+    const diffHorasTotal = diffMs / (1000 * 60 * 60);
+    const dias = Math.floor(diffHorasTotal / 24);
+    const horasRemanentes = Math.round(diffHorasTotal % 24);
+
+    let textoTiempo = '';
+    if (dias === 0) {
+        textoTiempo = `${horasRemanentes} h`;
+    } else {
+        textoTiempo = `${dias} d ${horasRemanentes} h`;
+    }
+
+    document.getElementById('stat-fecha-inicio').textContent = fechaInicioFmt;
+    document.getElementById('stat-dias-transcurridos').textContent = textoTiempo;
+    document.getElementById('stat-cruces-totales').textContent = totalCruces.toLocaleString();
+}
+
+/* ---------------------------------------------------------------------
+ * 1) RESUMEN GLOBAL
+ * ------------------------------------------------------------------- */
+function renderResumenGlobal() {
+    const todos = CRUCES['24'];
+
+    function ranking(paramKey) {
+        return MODELOS.map(m => ({ modelo: m, ...statsModelo(todos, m, paramKey) }))
+            .filter(s => s.mae !== null)
+            .sort((a, b) => a.mae - b.mae);
+    }
+    const rankViento = ranking('viento');
+    const rankRacha = ranking('racha');
+    const rankDir = ranking('dir');
+
+    const medals = ['1st', '2nd', '3rd'];
+    function pintarRanking(elId, list, unidad) {
+        let html = '';
+        if (list.length === 0) { 
+            html = '<p style="color:var(--text-sub); font-size:0.85rem;">No data yet</p>'; 
+        } else {
+            list.forEach((s, i) => {
+                const biasStr = s.bias !== null ? `${s.bias > 0 ? '+' : ''}${s.bias.toFixed(1)}${unidad}` : '-';
+                
+                html += `<div class="rank-item">
+                    <span class="rank-pos">${medals[i] || (i + 1) + 'th'}</span>
+                    <span class="rank-model">${s.modelo}</span>
+                    <span style="text-align:right;">
+                        <div class="rank-mae">${s.mae.toFixed(1)}${unidad}</div>
+                        <div class="rank-bias">Bias: ${biasStr}</div>
+                    </span>
+                </div>`;
+            });
+        }
+        document.getElementById(elId).innerHTML = html;
+    }
+
+    pintarRanking('rank-viento', rankViento, ' km/h');
+    pintarRanking('rank-racha', rankRacha, ' km/h');
+    pintarRanking('rank-dir', rankDir, '°');
+
+    const paramKeys = ['viento', 'racha', 'dir'];
+    const horizKeys = ['6', '24', '48', '72'];
+    const puntos = {}; MODELOS.forEach(m => puntos[m] = { suma: 0, celdas: 0 });
+
+    horizKeys.forEach(h => {
+        paramKeys.forEach(p => {
+            const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(CRUCES[h], m, p) }))
+                .filter(s => s.mae !== null)
+                .sort((a, b) => a.mae - b.mae);
+            rk.forEach((s, i) => { puntos[s.modelo].suma += (i + 1); puntos[s.modelo].celdas += 1; });
+        });
+    });
+    const ranking_general = MODELOS
+        .map(m => ({ modelo: m, media: puntos[m].celdas ? puntos[m].suma / puntos[m].celdas : null, celdas: puntos[m].celdas }))
+        .filter(s => s.media !== null)
+        .sort((a, b) => a.media - b.media);
+
+    const banner = document.getElementById('champion-banner');
+    if (ranking_general.length === 0) {
+        banner.innerHTML = '';
+    } else {
+        const medals = ['🥇 1st', '🥈 2nd', '🥉 3rd'];
+
+        let rowsHtml = ranking_general.map((r, i) => {
+            const medal = medals[i] || `${i + 1}th`;
+            return `
+                <div class="champion-row">
+                    <span class="champion-pos">${medal}</span>
+                    <span class="champion-model">${r.modelo}</span>
+                    <span class="champion-score"><b>${r.media.toFixed(2)}</b></span>
+                </div>
+            `;
+        }).join('');
+
+        banner.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${rowsHtml}
+            </div>
+        `;
+    }
+
+    let matrizHtml = '';
+    horizKeys.forEach(h => {
+        matrizHtml += `<tr><td>+${h}h <small style="color:var(--text-sub);">(n=${CRUCES[h].length})</small></td>`;
+        paramKeys.forEach(p => {
+            const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(CRUCES[h], m, p) }))
+                .filter(s => s.mae !== null)
+                .sort((a, b) => a.mae - b.mae);
+            if (rk.length === 0) {
+                matrizHtml += `<td><span class="badge badge-muted">no data</span></td>`;
+            } else {
+                const ganador = rk[0];
+                const valStr = p === 'dir' ? `${Math.round(ganador.mae)}°` : `${ganador.mae.toFixed(1)}`;
+                matrizHtml += `<td><span class="badge ${badgeClase[ganador.modelo]}">${ganador.modelo}</span><br><small>${valStr}</small></td>`;
+            }
+        });
+        matrizHtml += `</tr>`;
+    });
+    document.getElementById('matriz-body').innerHTML = matrizHtml;
+}
+
+/* ---------------------------------------------------------------------
+ * 3) Tabla por horizonte (24/48/72 x 3 modelos)
+ * ------------------------------------------------------------------- */
+function renderTablaHorizontes() {
+    let html = '';
+    ['6', '24', '48', '72'].forEach(h => {
+        const list = CRUCES[h];
+        if (list.length === 0) {
+            html += `<tr><td><b>+${h}h</b> (0)</td><td colspan="5" style="text-align:center;">No data</td></tr>`;
+            return;
+        }
+        const stats = {};
+        MODELOS.forEach(m => { 
+            const v = statsModelo(list, m, 'viento');
+            const r = statsModelo(list, m, 'racha');
+            const d = statsModelo(list, m, 'dir');
+            const score = calcularNotaGlobal(v.mae, r.mae, d.mae);
+            stats[m] = { v, r, d, score };
+        });
+
+        const minMedia = Math.min(...MODELOS.map(m => stats[m].v.mae).filter(v => v !== null));
+        const minRacha = Math.min(...MODELOS.map(m => stats[m].r.mae).filter(v => v !== null));
+        const minDir   = Math.min(...MODELOS.map(m => stats[m].d.mae).filter(v => v !== null));
+
+        const maxScore = Math.max(...MODELOS.map(m => stats[m].score).filter(v => v !== null));
+
+        const winTag = (val, minVal) => (val !== null && minVal !== null && val === minVal) ? ' <span class="badge-best-param">🟢 Best</span>' : '';
+
+        MODELOS.forEach(m => {
+            const s = stats[m];
+            const esGanadorGlobal = s.score !== null && maxScore !== null && s.score === maxScore;
+
+            html += `<tr>
+                <td><b>+${h}h</b> (${list.length})</td>
+                <td><span class="badge ${badgeClase[m]}">${m}</span></td>
+                <td>${fmtNum(s.v.mae, s.v.bias)}${winTag(s.v.mae, minMedia)}</td>
+                <td>${m === 'ECMWF' ? '<i>N/A</i>' : fmtNum(s.r.mae, s.r.bias) + winTag(s.r.mae, minRacha)}</td>
+                <td>${fmtDir(s.d.mae, s.d.bias)}${winTag(s.d.mae, minDir)}</td>
+                <td>${s.score === null ? '-' : '<b>' + s.score.toFixed(1) + ' / 10</b> ' + (esGanadorGlobal ? '<span class="badge badge-winner">🟢 Overall Winner</span>' : '')}</td>
+            </tr>`;
+        });
+    });
+    document.getElementById('tabla-horizontes').innerHTML = html;
+}
+
+/* ---------------------------------------------------------------------
+ * 4) Sección filtrable: gráficas + tabla por despegue
+ * ------------------------------------------------------------------- */
+function actualizarVistaDetalle() {
+    const lugarSel = document.getElementById('lugarSelect').value;
+    const horiz = document.getElementById('horizonteSelect').value;
+    const horaSel = document.getElementById('horaSelect').value;
+
+    let list = [];
+    if (horiz === 'all') {
+        list = [...CRUCES['6'], ...CRUCES['24'], ...CRUCES['48'], ...CRUCES['72']];
+    } else {
+        list = CRUCES[horiz] || [];
+    }
+
+    if (lugarSel !== 'todos') list = list.filter(it => it.lugar === lugarSel);
+    if (horaSel !== 'todas') list = list.filter(it => String(it.hora) === horaSel);
+
+    renderCharts(list);
+    renderTablaDespegues(list, lugarSel);
+    renderFormulaCorreccion(list);
+}
+
+function renderCharts(list) {
+    const lugares = [...new Set(list.map(it => it.lugar))];
+
+    // Sesgo viento por lugar
+    const dsBiasViento = MODELOS.map(m => ({
+        label: m,
+        data: lugares.map(l => { const s = statsModelo(list.filter(it => it.lugar === l), m, 'viento'); return s.bias; }),
+        backgroundColor: coloresModelo[m]
+    }));
+    if (charts.bias) charts.bias.destroy();
+    charts.bias = new Chart(document.getElementById('biasChart'), {
+        type: 'bar',
+        data: { labels: lugares, datasets: dsBiasViento },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Bias (km/h)' } } } }
+    });
+
+    // Sesgo racha por lugar
+    const dsBiasRacha = ['AromeHD', 'ICON-EU'].map(m => ({
+        label: m,
+        data: lugares.map(l => { const s = statsModelo(list.filter(it => it.lugar === l), m, 'racha'); return s.bias; }),
+        backgroundColor: coloresModelo[m]
+    }));
+    if (charts.biasRacha) charts.biasRacha.destroy();
+    charts.biasRacha = new Chart(document.getElementById('biasRachaChart'), {
+        type: 'bar',
+        data: { labels: lugares, datasets: dsBiasRacha },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Bias (km/h)' } } } }
+    });
+
+    // Histórico de error de viento por día
+    const dias = [...new Set(list.map(it => it.fecha))].sort();
+    const dsHistViento = MODELOS.map(m => {
+        const color = coloresModelo[m];
+        return {
+            label: m,
+            data: dias.map(d => { const s = statsModelo(list.filter(it => it.fecha === d), m, 'viento'); return s.mae; }),
+            borderColor: color.replace('0.75', '1'),
+            backgroundColor: color,
+            tension: 0.15, fill: false
+        };
+    });
+    if (charts.history) charts.history.destroy();
+    charts.history = new Chart(document.getElementById('historyChart'), {
+        type: 'line',
+        data: { labels: dias, datasets: dsHistViento },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Average Wind MAE (km/h)' }, beginAtZero: true } } }
+    });
+
+    // Histórico de error de racha por día
+    const dsHistRacha = ['AromeHD', 'ICON-EU'].map(m => {
+        const color = coloresModelo[m];
+        return {
+            label: m,
+            data: dias.map(d => { const s = statsModelo(list.filter(it => it.fecha === d), m, 'racha'); return s.mae; }),
+            borderColor: color.replace('0.75', '1'),
+            backgroundColor: color,
+            tension: 0.15, fill: false
+        };
+    });
+    if (charts.historyRacha) charts.historyRacha.destroy();
+    charts.historyRacha = new Chart(document.getElementById('historyRachaChart'), {
+        type: 'line',
+        data: { labels: dias, datasets: dsHistRacha },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Gust MAE (km/h)' }, beginAtZero: true } } }
+    });
+
+    // Histórico de error de dirección por día
+    const dsHistDir = MODELOS.map(m => {
+        const color = coloresModelo[m];
+        return {
+            label: m,
+            data: dias.map(d => { const s = statsModelo(list.filter(it => it.fecha === d), m, 'dir'); return s.mae; }),
+            borderColor: color.replace('0.75', '1'),
+            backgroundColor: color,
+            tension: 0.15, fill: false
+        };
+    });
+    if (charts.historyDir) charts.historyDir.destroy();
+    charts.historyDir = new Chart(document.getElementById('historyDirChart'), {
+        type: 'line',
+        data: { labels: dias, datasets: dsHistDir },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Direction MAE (°)' }, beginAtZero: true } } }
+    });
+}
+
+function renderTablaDespegues(listHorizonte, lugarFiltro) {
+    const porDespegue = {};
+    listHorizonte.forEach(it => {
+        if (lugarFiltro !== 'todos' && it.lugar !== lugarFiltro) return;
+        if (!porDespegue[it.idDespegue]) porDespegue[it.idDespegue] = { nombre: it.lugar, baliza: it.baliza, red: it.red, items: [] };
+        porDespegue[it.idDespegue].items.push(it);
+    });
+
+    let html = '';
+    Object.keys(porDespegue).forEach(id => {
+        const g = porDespegue[id];
+        const sA = { v: statsModelo(g.items, 'AromeHD', 'viento'), r: statsModelo(g.items, 'AromeHD', 'racha'), d: statsModelo(g.items, 'AromeHD', 'dir') };
+        const sI = { v: statsModelo(g.items, 'ICON-EU', 'viento'), r: statsModelo(g.items, 'ICON-EU', 'racha'), d: statsModelo(g.items, 'ICON-EU', 'dir') };
+        const sE = { v: statsModelo(g.items, 'ECMWF', 'viento'), d: statsModelo(g.items, 'ECMWF', 'dir') };
+
+        const valVA = sA.v.mae !== null ? sA.v.mae : Infinity;
+        const valVI = sI.v.mae !== null ? sI.v.mae : Infinity;
+        const valVE = sE.v.mae !== null ? sE.v.mae : Infinity;
+        const minV = Math.min(valVA, valVI, valVE);
+        const winV_A = valVA === minV;
+        const winV_I = valVI === minV;
+        const winV_E = valVE === minV;
+
+        const valRA = sA.r.mae !== null ? sA.r.mae : Infinity;
+        const valRI = sI.r.mae !== null ? sI.r.mae : Infinity;
+        const minR = Math.min(valRA, valRI);
+        const winR_A = valRA === minR;
+        const winR_I = valRI === minR;
+
+        const valDA = sA.d.mae !== null ? sA.d.mae : Infinity;
+        const valDI = sI.d.mae !== null ? sI.d.mae : Infinity;
+        const valDE = sE.d.mae !== null ? sE.d.mae : Infinity;
+        const minD = Math.min(valDA, valDI, valDE);
+        const winD_A = valDA === minD;
+        const winD_I = valDI === minD;
+        const winD_E = valDE === minD;
+
+        const scoreA = calcularNotaGlobal(sA.v.mae, sA.r.mae, sA.d.mae);
+        const scoreI = calcularNotaGlobal(sI.v.mae, sI.r.mae, sI.d.mae);
+        const scoreE = calcularNotaGlobal(sE.v.mae, null, sE.d.mae);
+
+        const candidatos = [
+            { name: 'AromeHD', score: scoreA },
+            { name: 'ICON-EU', score: scoreI },
+            { name: 'ECMWF',   score: scoreE }
+        ].filter(c => c.score !== null);
+
+        let mejor = '-';
+        if (candidatos.length) {
+            const maxS = Math.max(...candidatos.map(c => c.score));
+            const w = candidatos.find(c => c.score === maxS);
+            mejor = `<span class="badge ${badgeClase[w.name]}">${w.name} (${w.score.toFixed(1)})</span>`;
+        }
+
+        const fmtCol = (v, r, d, winV, winR, winD) => {
+            if (v.mae === null) return '-';
+            
+            const winStyle = 'border: 2px solid #e74c3c; border-radius: 4px; padding: 1px 4px; font-weight: bold; color: #c0392b;';
+            
+            let vHtml = winV ? `<span style="${winStyle}">${v.mae.toFixed(1)}</span>` : `<b>${v.mae.toFixed(1)}</b>`;
+            let txt = vHtml;
+            
+            if (r && r.mae !== null) {
+                let rHtml = winR ? `<span style="${winStyle}">${r.mae.toFixed(1)}</span>` : r.mae.toFixed(1);
+                txt += ` / ${rHtml}`;
+            }
+            
+            if (d.mae !== null) {
+                let dBias = d.bias !== null ? `${d.bias > 0 ? '+' : ''}${Math.round(d.bias)}°` : '-';
+                let dHtml = winD ? `<span style="${winStyle}">${Math.round(d.mae)}°</span>` : `${Math.round(d.mae)}°`;
+                txt += ` / ${dHtml} <small>(${dBias})</small>`;
+            }
+            return txt;
+        };
+
+        const totalMuestras = g.items.length;
+        const link = LINKS_DESPEGUES[id] || '#';
+        const nombreHtml = (link && link !== '#') 
+            ? `<a href="${link}" target="_blank" title="View on map" style="color: #0000EE; text-decoration: underline;"><b>${g.nombre}</b></a>` 
+            : `<b>${g.nombre}</b>`;
+        const urlBaliza = getBalizaUrl(g.red, g.baliza);
+        const balizaHtml = urlBaliza !== '#' 
+            ? `<a href="${urlBaliza}" target="_blank" title="View on official website" style="color: #0000EE; text-decoration: underline;"><code>${g.baliza}</code></a>` 
+            : `<code>${g.baliza}</code>`;
+
+        html += `<tr>
+            <td>${nombreHtml}</td>
+            <td>${balizaHtml}</td>
+            <td style="text-align:center; font-weight:bold;">${totalMuestras}</td>
+            <td>${fmtCol(sA.v, sA.r, sA.d, winV_A, winR_A, winD_A)}</td>
+            <td>${fmtCol(sI.v, sI.r, sI.d, winV_I, winR_I, winD_I)}</td>
+            <td>${fmtCol(sE.v, null, sE.d, winV_E, false, winD_E)}</td>
+            <td>${mejor}</td>
+        </tr>`;
+    });
+    document.getElementById('tabla-despegues').innerHTML = html || `<tr><td colspan="7" style="text-align:center;">No data for this filter</td></tr>`;
+}
+
+function renderFormulaCorreccion(list) {
+    const divFormula = document.getElementById('formula-correccion');
+    const divDetalle = document.getElementById('formula-detalle');
+    
+    const regArome = calcRegresion(list, 'AromeHD', 'viento');
+    const regIcon = calcRegresion(list, 'ICON-EU', 'viento');
+    const regEcmwf = calcRegresion(list, 'ECMWF', 'viento');
+    
+    let html = '';
+    
+    // Concatenamos la fórmula y, en un span gris justo después, ponemos el R² y la n
+    if (regArome.n >= 5) {
+        html += `AromeHD: <span style="color: #1976d2;">Actual = (${regArome.m.toFixed(2)} * Forecast) + ${regArome.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regArome.r2*100).toFixed(0)}%, n=${regArome.n})</span><br>`;
+    }
+    if (regIcon.n >= 5) {
+        html += `ICON-EU: <span style="color: #7b1fa2;">Actual = (${regIcon.m.toFixed(2)} * Forecast) + ${regIcon.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regIcon.r2*100).toFixed(0)}%, n=${regIcon.n})</span><br>`;
+    }
+    if (regEcmwf.n >= 5) {
+        html += `ECMWF: <span style="color: #388e3c;">Actual = (${regEcmwf.m.toFixed(2)} * Forecast) + ${regEcmwf.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regEcmwf.r2*100).toFixed(0)}%, n=${regEcmwf.n})</span>`;
+    }
+    
+    if (html === '') {
+        divFormula.innerHTML = "At least 5 samples are needed with current filters to calculate the formula.";
+        divDetalle.innerHTML = "";
+    } else {
+        divFormula.innerHTML = html;
+        // Dejamos solo la nota explicativa abajo
+        divDetalle.innerHTML = "* R² (Coefficient of Determination) indicates the formula reliability with current sample size. If low, the model is chaotic and cannot be corrected with this system.";
+    }
+}
+</script>
+</body>
+</html>
