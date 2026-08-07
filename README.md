@@ -40,7 +40,7 @@ This repository contains the front-end dashboard that processes and visualizes t
 
 ## 🤝 Open Source & Contributions
 
-The code for this dashboard is completely open source. While the project is still evolving, I want to invite the community to get involved.
+The code for this dashboard is completely open source and free software. While the project is still evolving, I want to invite the community to get involved.
 
 If you spot a bug, have an idea for a new metric, or want to improve the data visualization, your contributions are highly welcome! Feel free to:
 
@@ -50,8 +50,5 @@ If you spot a bug, have an idea for a new metric, or want to improve the data vi
 ## 📅 Current Status & Next Steps
 
 The study is live and in continuous evolution. Data is being captured and accumulated daily, so the statistics will become more robust over time.
-
-> **🌴 Vacation Notice:**
-> I will be away on vacation for the next few weeks. The automated system will keep running smoothly in the background, quietly collecting data without any code changes. When I return, I will thoroughly review all feedback, study potential improvements, and apply them. It will likely take a few months of data accumulation before we have a truly statistically significant dataset to draw solid conclusions from.
 
 **Let's make weather forecasting for free-flight more transparent and accurate together! 🌬️**
