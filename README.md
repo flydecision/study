@@ -4,17 +4,17 @@ A continuous 24/7 automated analysis comparing weather model forecasts with real
 
 The ultimate goal of this project is to discover which weather model performs best: overall, or specifically by parameters, locations, times, or forecast horizons. This data is openly published to help the free-flight community make better, more informed decisions.
 
-- 🌐 **Live Dashboard:** [FlyDecision Weather Study](#) <!-- Reemplaza el # con tu enlace real -->
+- 🌐 **Live Dashboard:** [FlyDecision Weather Study](https://flydecision.com/estudio) 
 - 🪂 **Main App:** [FlyDecision.com](https://flydecision.com)
 
 ## 🌍 Special Thanks & Data Usage
 
-A huge shoutout and thank you to **Open-Meteo** for their fantastic, free API and magnificent service. Without their platform, accessing this forecast data and making this study possible would be much harder.
+A huge shoutout and thank you to **Open-Meteo** for their fantastic API and magnificent service. Without their platform, accessing this forecast data and making this study possible would be much harder or impossible for us.
 
 ### 📊 How data is consumed:
 All forecast data used in this study is extracted from the already downloaded `.json` files generated for the main FlyDecision app. This means the study itself consumes **zero additional Open-Meteo API calls**.
 
-> **Note on ECMWF:** You might notice that ECMWF gust data is missing. I have intentionally excluded it because I am currently very close to my API credit limit. The main app works perfectly right now, and I don't want to risk exceeding the quota and disrupting the primary service.
+> **Note on ECMWF:** You might notice that ECMWF gust data is missing. We have intentionally excluded it because I am currently very close to my API credit limit. The main app works perfectly right now, and I don't want to risk exceeding the quota and disrupting the primary service.
 
 ## 🔍 What Does the Study Analyze?
 
@@ -36,7 +36,7 @@ The dashboard provides several views and metrics:
 This repository contains the front-end dashboard that processes and visualizes the data.
 
 - `index.html` - The main dashboard containing HTML, CSS, and JavaScript (Chart.js) to parse the CSV and render the tables, charts, and OLS calculations.
-- `estudio.csv` - *(Ignored in this repo)* The raw data file generated automatically by the FlyDecision backend. You can view the source data [here](#). <!-- Reemplaza el # con tu enlace real -->
+- `estudio.csv` - *(Ignored in this repo)* The raw data file generated automatically by the FlyDecision backend. You can view the source data [here](https://docs.google.com/spreadsheets/d/1q4gKHEBlgoGtcxPWoi5eiqz-Fm2nykaa0Z5JbAgsi18/edit). 
 
 ## 🤝 Open Source & Contributions
 
