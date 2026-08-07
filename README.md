@@ -47,6 +47,12 @@ If you spot a bug, have an idea for a new metric, or want to improve the data vi
 - **Open an Issue** to report a bug or suggest a feature.
 - **Submit a Pull Request** with your improvements.
 
+## 📜 License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+This ensures that the project and any derivative works (including network services) remain free and open-source. See the [LICENSE](LICENSE) file for details.
+
 ## 📅 Current Status & Next Steps
 
 The study is live and in continuous evolution. Data is being captured and accumulated daily, so the statistics will become more robust over time.
