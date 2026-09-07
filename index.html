@@ -148,21 +148,10 @@
         text-align: right;
     }
 
-    .ranking-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 6px; }
-    .ranking-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-    .ranking-card h3 { margin: 0 0 12px 0; color: var(--text-main); border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-    .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
-    .rank-pos { font-size: 1.1rem; margin-right: 8px; width: 33px; text-align: center; }
-    .rank-model { font-weight: 700; flex-grow: 1; font-size: 0.9rem; }
-    .rank-mae { font-weight: 700; }
-    .rank-bias { font-size: 1rem; color: var(--text-sub); }
-
     /* Matriz Horizonte x Parámetro */
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
     th, td { padding: 10px 9px; border-bottom: 1px solid var(--border); }
     th { background-color: #f8fafc; color: var(--text-sub); font-weight: 600; }
-    /* .matrix-table td { text-align: center; }  <-- Eliminada para alinear a la izquierda */
-    .matrix-table th:first-child, .matrix-table td:first-child { text-align: left; font-weight: 700; }
 
     .badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; white-space: nowrap; }
     .badge-arome { background: #e3f2fd; color: #1976d2; }
@@ -289,54 +278,9 @@
             </div>
         </div>
 
-        <!-- ============ RANKING POR PARÁMETRO ============ -->
+        <!-- ============ TABLA POR HORIZONTE, MODELO Y PARÁMETROS ============ -->
         <div class="section-card">
-            <h2>🏆 Parameter Ranking for +24h Forecast Horizon:</h2>
-            <div class="section-desc">
-                Averages the absolute error (MAE) for average wind and gust, as well as accumulated bias at 24 hours out (ECMWF does not compete in gust as it does not record that parameter). For direction, it averages the absolute angular error (0° to 180°) and displays in parentheses the signed directional bias (+ / - depending on clockwise or counter-clockwise rotation relative to real wind).<br><br>
-            </div>
-
-            <div class="ranking-grid">
-                <div class="ranking-card"><h3>Average Wind</h3><div id="rank-viento"></div></div>
-                <div class="ranking-card"><h3>Gust</h3><div id="rank-racha"></div></div>
-                <div class="ranking-card"><h3>Direction</h3><div id="rank-dir"></div></div>
-            </div>
-
-            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
-                <b>ℹ️ Quick Glossary:</b>
-                <p style="margin: 8px 0 4px;">
-                    • <b>Mean Absolute Error (MAE):</b> The "magnitude of the error", regardless of whether it is an overestimation or underestimation.
-                </p>
-                <p style="margin: 0 0 8px;">
-                    • <b>Bias:</b> Indicates whether the model tends to predict more or less wind than actual (e.g., -4 km/h means it tends to underestimate, so actual wind will likely be higher).
-                </p>
-                <p style="margin: 0;">
-                    For all statistical calculations on the <i>Direction</i> parameter, a minimum speed threshold of 8 km/h has been established (slightly higher than the ICAO/METAR standard of 3 knots / 5.5 km/h). The goal is to minimize what is called in meteorological statistics "the noise of calms" (large random direction fluctuations in light winds).
-                </p>
-                <p style="margin: 0;">
-                    AromeHD does not compete in +48h and +72h horizons.
-                </p>
-            </div>
-
-        </div>
-
-        <!-- ============ GANADOR POR HORIZONTE Y POR PARÁMETRO ============ -->
-        <div class="section-card">
-            <h2>🏆 Winner by Horizon and Parameter (Summary):</h2>
-            <div class="section-desc">Cross-table of forecast horizons (+6h, +24h, +48h, +72h) with analyzed parameters (average wind, gust, and direction). Shows the winning model label in each specific cell alongside its Mean Absolute Error (MAE).</div>
-
-            <table class="matrix-table">
-                <thead><tr><th>Horizon</th><th>Average Wind</th><th>Gust</th><th>Direction</th></tr></thead>
-                <tbody id="matriz-body"></tbody>
-            </table>
-            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
-                ℹ️ AromeHD does not compete in +48h and +72h horizons. n = Current number of samples.
-            </div>
-        </div>
-
-        <!-- ============ TABLA POR HORIZONTE ============ -->
-        <div class="section-card">
-            <h2>🏆 Results by Horizon, Model and Parameter:</h2>
+            <h2>🏆 Results by Horizon, Model and Parameters:</h2>
             <div class="section-desc">Cross-table of forecast time horizons (+6h, +24h, +48h, +72h) for each model and analyzed parameters (average wind, maximum wind gust and wind direction). Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and Bias.</div>
             <table>
                 <thead>
@@ -936,42 +880,6 @@ function renderEstadoEstudio(rows) {
  * ------------------------------------------------------------------- */
 function renderResumenGlobal() {
     const todos = CRUCES['24'];
-
-    function ranking(paramKey) {
-        return MODELOS.map(m => ({ modelo: m, ...statsModelo(todos, m, paramKey) }))
-            .filter(s => s.mae !== null)
-            .sort((a, b) => a.mae - b.mae);
-    }
-    const rankViento = ranking('viento');
-    const rankRacha = ranking('racha');
-    const rankDir = ranking('dir');
-
-    const medals = ['1st', '2nd', '3rd'];
-    function pintarRanking(elId, list, unidad) {
-        let html = '';
-        if (list.length === 0) { 
-            html = '<p style="color:var(--text-sub); font-size:0.85rem;">No data yet</p>'; 
-        } else {
-            list.forEach((s, i) => {
-                const biasStr = s.bias !== null ? `${s.bias > 0 ? '+' : ''}${s.bias.toFixed(1)}${unidad}` : '-';
-                
-                html += `<div class="rank-item">
-                    <span class="rank-pos">${medals[i] || (i + 1) + 'th'}</span>
-                    <span class="rank-model">${s.modelo}</span>
-                    <span style="text-align:right;">
-                        <div class="rank-mae">MAE: ${s.mae.toFixed(1)}${unidad}</div>
-                        <div class="rank-bias">Bias: ${biasStr}</div>
-                    </span>
-                </div>`;
-            });
-        }
-        document.getElementById(elId).innerHTML = html;
-    }
-
-    pintarRanking('rank-viento', rankViento, ' km/h');
-    pintarRanking('rank-racha', rankRacha, ' km/h');
-    pintarRanking('rank-dir', rankDir, '°');
-
     const paramKeys = ['viento', 'racha', 'dir'];
     const horizKeys = ['6', '24', '48', '72'];
     const puntos = {}; MODELOS.forEach(m => puntos[m] = { suma: 0, celdas: 0 });
@@ -1012,25 +920,6 @@ function renderResumenGlobal() {
             </div>
         `;
     }
-
-    let matrizHtml = '';
-    horizKeys.forEach(h => {
-        matrizHtml += `<tr><td>+${h}h <small style="color:var(--text-sub);">(n=${CRUCES[h].length})</small></td>`;
-        paramKeys.forEach(p => {
-            const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(CRUCES[h], m, p) }))
-                .filter(s => s.mae !== null)
-                .sort((a, b) => a.mae - b.mae);
-            if (rk.length === 0) {
-                matrizHtml += `<td><span class="badge badge-muted">no data</span></td>`;
-            } else {
-                const ganador = rk[0];
-                const valStr = p === 'dir' ? `${Math.round(ganador.mae)}°` : `${ganador.mae.toFixed(1)}`;
-                matrizHtml += `<td><span class="badge ${badgeClase[ganador.modelo]}">${ganador.modelo}</span><br><small>${valStr}</small></td>`;
-            }
-        });
-        matrizHtml += `</tr>`;
-    });
-    document.getElementById('matriz-body').innerHTML = matrizHtml;
 }
 
 /* ---------------------------------------------------------------------
