@@ -1,0 +1,98 @@
+﻿id_despegue;id_baliza;nombre_lugar;archivo_datos_balizas;link
+838;C066;Untzueta;balizas_euskalmet_6h.json;https://flydecision.com/?lat=43.1370&lon=-2.9080&zoom=14
+790;C048;Herrera;balizas_euskalmet_6h.json;https://flydecision.com/?lat=42.5930&lon=-2.6710&zoom=14
+790;C048;Herrera;balizas_euskalmet_6h.json;https://flydecision.com/?lat=42.5930&lon=-2.6710&zoom=14
+770;s1126;Santa Marina (Iturmendi);balizas_holfuy_6h.json;https://flydecision.com/?lat=42.8685&lon=-2.1157&zoom=14
+1023;s1604;Montana - Cry d'Er;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.3370&lon=7.4801&zoom=14
+1187;s1809;Crap Sogn Gion / Flims;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.8339&lon=9.2154&zoom=14
+1162;s1287;Klein Matterhorn;balizas_holfuy_6h.json;https://flydecision.com/?lat=45.9346&lon=7.7311&zoom=14
+847;s578;Arrona;balizas_holfuy_6h.json;https://flydecision.com/?lat=43.2460&lon=-2.2697&zoom=14
+849;s310;Belar;balizas_holfuy_6h.json;https://flydecision.com/?lat=43.0047&lon=-2.4218&zoom=14
+448;s223;Pico Muelas - Boñar;balizas_holfuy_6h.json;https://flydecision.com/?lat=42.8745&lon=-5.3751&zoom=14
+1066;s484;Metschstand;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.4436&lon=7.4962&zoom=14
+1225;s511;Buchenberg;balizas_holfuy_6h.json;https://flydecision.com/?lat=47.6067&lon=10.8111&zoom=14
+1191;s536;Zillertal / Mayrhofen;balizas_holfuy_6h.json;https://flydecision.com/?lat=47.2190&lon=11.8246&zoom=14
+1064;s549;Vounetz;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.6252&lon=7.2059&zoom=14
+1061;s690;Sonchaux (Villeneuve);balizas_holfuy_6h.json;https://flydecision.com/?lat=46.4183&lon=6.9509&zoom=14
+1227;s742;Schlick2000 (Stubaital - Kreuzjoch);balizas_holfuy_6h.json;https://flydecision.com/?lat=47.1451&lon=11.3078&zoom=14
+1224;s905;Tegelberg;balizas_holfuy_6h.json;https://flydecision.com/?lat=47.5599&lon=10.7798&zoom=14
+1021;s927;Cret du Midi;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.2294&lon=7.5283&zoom=14
+1022;s1307;Verbier;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.0901&lon=7.2516&zoom=14
+1019;s1340;Tschenten;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.4973&lon=7.5418&zoom=14
+246;s1353;Pico del Sol;balizas_holfuy_6h.json;https://flydecision.com/?lat=43.4716&lon=-5.6588&zoom=14
+1229;s1473;Penken / Mayrhofen;balizas_holfuy_6h.json;https://flydecision.com/?lat=47.1759&lon=11.8167&zoom=14
+1168;s1547;Arosa Weisshorn;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.7894&lon=9.6382&zoom=14
+1020;s1568;Vercorin;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.2594&lon=7.5289&zoom=14
+1067;s1639;Zermatt - Rothorn - Blauherd - Sunegga;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.0211&lon=7.7992&zoom=14
+1188;s1700;Bargella;balizas_holfuy_6h.json;https://flydecision.com/?lat=47.1409&lon=9.5490&zoom=14
+273;s1748;Cala Tirant;balizas_holfuy_6h.json;https://flydecision.com/?lat=40.0463&lon=4.1005&zoom=14
+1161;s1827;Gornergrat / Riffelberg;balizas_holfuy_6h.json;https://flydecision.com/?lat=45.9834&lon=7.7791&zoom=14
+275;s1879;Monte Toro;balizas_holfuy_6h.json;https://flydecision.com/?lat=39.9853&lon=4.1135&zoom=14
+1223;s1306;Venet;balizas_holfuy_6h.json;https://flydecision.com/?lat=47.1463&lon=10.6291&zoom=14
+568;WQ;Àger (Coll d'Ares);balizas_meteocat_6h.json;https://flydecision.com/?lat=42.0461&lon=0.7462&zoom=14
+539;XK;Montseny (Turó de l'Home);balizas_meteocat_6h.json;https://flydecision.com/?lat=41.7733&lon=2.4385&zoom=14
+547;WM;Queralt;balizas_meteocat_6h.json;https://flydecision.com/?lat=42.1058&lon=1.8245&zoom=14
+527;ESCAT0800000008572B;Bellmunt;balizas_meteoclimatic_6h.json;https://flydecision.com/?lat=42.0999&lon=2.2937&zoom=14
+582;ESCAT0800000025716A;Pedraforca;balizas_meteoclimatic_6h.json;https://flydecision.com/?lat=42.2375&lon=1.7038&zoom=14
+411;ESCYL0900000009589B;Castro Grande;balizas_meteoclimatic_6h.json;https://flydecision.com/?lat=43.0910&lon=-3.2230&zoom=14
+1005;6081001;Thorenc - Col de Bleyne;balizas_meteofrance_6h.json;https://flydecision.com/?lat=43.8103&lon=6.9035&zoom=14
+657;10172;Las Nieves;balizas_meteogalicia_6h.json;https://flydecision.com/?lat=42.1337&lon=-8.4132&zoom=14
+663;10133;Xesteiras;balizas_meteogalicia_6h.json;https://flydecision.com/?lat=42.6750&lon=-8.5871&zoom=14
+731;GN23;Arangoiti;balizas_meteonavarra_6h.json;https://flydecision.com/?lat=42.6449&lon=-1.1878&zoom=14
+938;1784;Baigura ;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.2948&lon=-1.2883&zoom=14
+459;1727;Arcones;balizas_pioupiou_6h.json;https://flydecision.com/?lat=41.0772&lon=-3.7077&zoom=14
+465;1597;Somosierra;balizas_pioupiou_6h.json;https://flydecision.com/?lat=41.1502&lon=-3.6135&zoom=14
+854;2058;Hernio (Ernio);balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.1733&lon=-2.1586&zoom=14
+56;1477;Loja Poniente;balizas_pioupiou_6h.json;https://flydecision.com/?lat=37.1327&lon=-4.1838&zoom=14
+64;1393;Otívar;balizas_pioupiou_6h.json;https://flydecision.com/?lat=36.8337&lon=-3.7021&zoom=14
+65;1481;Peña Escrita;balizas_pioupiou_6h.json;https://flydecision.com/?lat=36.8176&lon=-3.7703&zoom=14
+236;2116;Naranco;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.3844&lon=-5.8641&zoom=14
+364;2182;Ibio;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.2912&lon=-4.1420&zoom=14
+899;2003;Figueroles;balizas_pioupiou_6h.json;https://flydecision.com/?lat=40.1380&lon=-0.2253&zoom=14
+921;2135;Milagrosa;balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.6416&lon=-0.3180&zoom=14
+937;2089;Accous;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.9815&lon=-0.5715&zoom=14
+956;2125;Céret;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.4588&lon=2.7677&zoom=14
+957;1213;Cier-de-Rivière;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.0589&lon=0.6146&zoom=14
+958;260;Couraduque / Val d'Azun;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.9906&lon=-0.1965&zoom=14
+960;2009;Le Courouaou / Col de la Courade;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.9980&lon=0.1680&zoom=14
+967;1376;Pla d'Adet;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8135&lon=0.2982&zoom=14
+968;327;Port de Lers;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8125&lon=1.3934&zoom=14
+969;2005;Prat d'Albis;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.9219&lon=1.5815&zoom=14
+977;1568;Montlambert;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.5528&lon=6.1048&zoom=14
+981;1470;La Clusaz - Crêt du Loup;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.8909&lon=6.4513&zoom=14
+984;159;Chamoux;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.5295&lon=6.2529&zoom=14
+989;170;Allevard;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.3922&lon=6.1151&zoom=14
+991;1436;St. Jean - Monclar (Dormillouse);balizas_pioupiou_6h.json;https://flydecision.com/?lat=44.4027&lon=6.3715&zoom=14
+997;1495;Le Belvédère;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.0894&lon=5.5936&zoom=14
+1004;1698;Gréolières;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.8005&lon=6.9558&zoom=14
+1010;2114;Aiguines;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.7695&lon=6.2535&zoom=14
+1013;2139;Les Angles;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.5717&lon=2.0560&zoom=14
+1015;928;Dourgne;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.4758&lon=2.1431&zoom=14
+1051;1636;Le Morclan;balizas_pioupiou_6h.json;https://flydecision.com/?lat=46.2760&lon=6.8612&zoom=14
+1063;449;Grandvillard / Levanchy;balizas_pioupiou_6h.json;https://flydecision.com/?lat=46.5455&lon=7.1132&zoom=14
+1064;1783;Vounetz;balizas_pioupiou_6h.json;https://flydecision.com/?lat=46.6252&lon=7.2059&zoom=14
+1080;1543;Ens;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8058&lon=0.3329&zoom=14
+1086;313;Cornudere;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.9578&lon=0.8908&zoom=14
+1089;72;Ausseing;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.1599&lon=1.0235&zoom=14
+1100;1357;Belesta / Roc des Grenouilles;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.9001&lon=1.9638&zoom=14
+1106;131;Ginoles;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8748&lon=2.1512&zoom=14
+1113;1308;L'Olivier / Quéribus;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8466&lon=2.6238&zoom=14
+1129;1428;Malanotte;balizas_pioupiou_6h.json;https://flydecision.com/?lat=44.2593&lon=7.7942&zoom=14
+1130;1407;Liretta;balizas_pioupiou_6h.json;https://flydecision.com/?lat=44.4990&lon=7.3820&zoom=14
+1142;2031;Digne les Bains - l'Andran;balizas_pioupiou_6h.json;https://flydecision.com/?lat=44.1138&lon=6.2148&zoom=14
+1171;1446;Sapenay;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.8220&lon=5.8664&zoom=14
+34;1690;Carchuna;balizas_pioupiou_6h.json;https://flydecision.com/?lat=36.6999&lon=-3.4641&zoom=14
+68;1626;Polopos  ;balizas_pioupiou_6h.json;https://flydecision.com/?lat=36.8067&lon=-3.3029&zoom=14
+36;1638;Cenes de la Vega;balizas_pioupiou_6h.json;https://flydecision.com/?lat=37.1425&lon=-3.5195&zoom=14
+878;2064;Coll de Rates;balizas_pioupiou_6h.json;https://flydecision.com/?lat=38.7230&lon=-0.0790&zoom=14
+925;2002;Petrés;balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.6875&lon=-0.3022&zoom=14
+932;2004;Villar del Arzobispo (Cerro Castellar);balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.7280&lon=-0.8512&zoom=14
+967;1376;Pla d'Adet;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8135&lon=0.2982&zoom=14
+1070;1588;Col de la Core;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8613&lon=1.1079&zoom=14
+253;2079;Resquilones;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.3971&lon=-4.8308&zoom=14
+1008;373;Moustiers - Courchon;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.8433&lon=6.2303&zoom=14
+985;1592;Val Pelouse;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.4198&lon=6.1705&zoom=14
+1136;1659;Santa Elisabetta;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.4388&lon=7.6470&zoom=14
+1058;1722;L'épine - Lac d'Aiguebelette;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.6018&lon=5.8072&zoom=14
+978;1724;PlanPraz /  Brevent;balizas_pioupiou_6h.json;https://flydecision.com/?lat=45.9368&lon=6.8510&zoom=14
+1172;1223;Le Bouant;balizas_pioupiou_6h.json;https://flydecision.com/?lat=46.1608&lon=5.8358&zoom=14

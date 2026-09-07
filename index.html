@@ -336,13 +336,13 @@
 
         <!-- ============ TABLA POR HORIZONTE ============ -->
         <div class="section-card">
-            <h2>🏆 Winner by Horizon and Parameter (Detailed):</h2>
-            <div class="section-desc">Cross-table of forecast horizons (+6h, +24h, +48h, +72h) with analyzed parameters (average wind, gust, and direction) and models. Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and bias.</div>
+            <h2>🏆 Results by Horizon, Model and Parameter:</h2>
+            <div class="section-desc">Cross-table of forecast time horizons (+6h, +24h, +48h, +72h) for each model and analyzed parameters (average wind, maximum wind gust and wind direction). Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and Bias.</div>
             <table>
                 <thead>
                     <tr>
                         <th>Horizon</th><th>Model</th>
-                        <th>Average Wind</th>
+                        <th>Average</th>
                         <th>Gust</th>
                         <th>Direction</th>
                         <th>Global Score</th>
@@ -351,9 +351,24 @@
                 <tbody id="tabla-horizontes"><tr><td colspan="6" style="text-align:center;">Loading…</td></tr></tbody>
             </table>
             <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
-                    ℹ️ Global Score (0-10) is calculated weighted: Penalty = (Avg MAE × 0.4) + (Gust MAE × 0.3) + (Dir Error × 0.08 × 0.3). Score = max(0, 10 - Penalty / 1.5).
-                <p style="margin: 8px 0 0;">
-                    AromeHD does not compete in +48h and +72h horizons.
+                <b>ℹ️ Quick Glossary:</b>
+                <p style="margin: 8px 0 4px;">
+                    • <b>Mean Absolute Error (MAE):</b> The "magnitude of the error", regardless of whether it is an overestimation or underestimation.
+                </p>
+                <p style="margin: 0 0 8px;">
+                    • <b>Bias:</b> Indicates whether the model tends to predict more or less wind than actual (e.g., -4 km/h means it tends to underestimate, so actual wind will likely be higher).
+                </p>
+                <p style="margin: 0 0 8px;">
+                    For all statistical calculations on the <i>Direction</i> parameter, a minimum speed threshold of 8 km/h has been established (slightly higher than the ICAO/METAR standard of 3 knots / 5.5 km/h). The goal is to minimize what is called in meteorological statistics "the noise of calms" (large random direction fluctuations in light winds).
+                </p>
+                <p style="margin: 0 0 8px;">
+                    <b>ℹ️ Global Score (0-10) is calculated weighted:</b> Penalty = (Avg MAE × 0.4) + (Gust MAE × 0.3) + (Dir Error × 0.08 × 0.3). Score = max(0, 10 - Penalty / 1.5).
+                </p>
+                <p style="margin: 0 0 8px;">
+                    ℹ️ AromeHD does not compete in +48h and +72h horizons.
+                </p>
+                <p style="margin: 0 0 8px;">
+                    ℹ️ ECMWF does not compete in gust as it does not record that parameter.
                 </p>
             </div>
         </div>
@@ -944,7 +959,7 @@ function renderResumenGlobal() {
                     <span class="rank-pos">${medals[i] || (i + 1) + 'th'}</span>
                     <span class="rank-model">${s.modelo}</span>
                     <span style="text-align:right;">
-                        <div class="rank-mae">${s.mae.toFixed(1)}${unidad}</div>
+                        <div class="rank-mae">MAE: ${s.mae.toFixed(1)}${unidad}</div>
                         <div class="rank-bias">Bias: ${biasStr}</div>
                     </span>
                 </div>`;
