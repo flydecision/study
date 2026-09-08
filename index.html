@@ -150,7 +150,7 @@
 
     /* Matriz Horizonte x Parámetro */
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
-    th, td { padding: 10px 9px; border-bottom: 1px solid var(--border); }
+    th, td { padding: 10px 9px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     th { background-color: #f8fafc; color: var(--text-sub); font-weight: 600; }
 
     .badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; white-space: nowrap; }
@@ -832,8 +832,8 @@ function fmtDir(mae, bias) {
 }
 function fmtNum(mae, bias, unidad = '') {
     if (mae === null) return '-';
-    const b = bias !== null ? `${bias > 0 ? '+' : ''}${bias.toFixed(1)}` : '-';
-    return `${mae.toFixed(1)}${unidad} <small>(${b})</small>`;
+    const b = bias !== null ? `${bias > 0 ? '+' : ''}${bias.toFixed(1)}${unidad}` : '-';
+    return `<div>MAE: ${mae.toFixed(1)}${unidad}</div><div>Bias: ${b}</div>`;
 }
 
 /* ---------------------------------------------------------------------
@@ -930,7 +930,7 @@ function renderTablaHorizontes() {
     ['6', '24', '48', '72'].forEach(h => {
         const list = CRUCES[h];
         if (list.length === 0) {
-            html += `<tr><td><b>+${h}h</b> (0)</td><td colspan="5" style="text-align:center;">No data</td></tr>`;
+            html += `<tr><td><b>+${h}h</b></td><td colspan="5" style="text-align:center;">No data</td></tr>`;
             return;
         }
         const stats = {};
@@ -950,15 +950,15 @@ function renderTablaHorizontes() {
 
         const winTag = (val, minVal) => (val !== null && minVal !== null && val === minVal) ? ' <span class="badge-best-param">🟢 Best</span>' : '';
 
-        MODELOS.forEach(m => {
+        MODELOS.forEach((m, idx) => {
             const s = stats[m];
             const esGanadorGlobal = s.score !== null && maxScore !== null && s.score === maxScore;
 
             html += `<tr>
-                <td><b>+${h}h</b> (${list.length})</td>
+                ${idx === 0 ? `<td rowspan="${MODELOS.length}"><b>+${h}h</b></td>` : ''}
                 <td><span class="badge ${badgeClase[m]}">${m}</span></td>
-                <td>${fmtNum(s.v.mae, s.v.bias)}${winTag(s.v.mae, minMedia)}</td>
-                <td>${m === 'ECMWF' ? '<i>N/A</i>' : fmtNum(s.r.mae, s.r.bias) + winTag(s.r.mae, minRacha)}</td>
+                <td>${fmtNum(s.v.mae, s.v.bias, ' km/h')}${winTag(s.v.mae, minMedia)}</td>
+                <td>${m === 'ECMWF' ? '<i>N/A</i>' : fmtNum(s.r.mae, s.r.bias, ' km/h') + winTag(s.r.mae, minRacha)}</td>
                 <td>${fmtDir(s.d.mae, s.d.bias)}${winTag(s.d.mae, minDir)}</td>
                 <td>${s.score === null ? '-' : '<b>' + s.score.toFixed(1) + ' / 10</b> ' + (esGanadorGlobal ? '<span class="badge badge-winner">🟢 Overall Winner</span>' : '')}</td>
             </tr>`;
