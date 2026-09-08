@@ -151,6 +151,7 @@
     /* Matriz Horizonte x Parámetro */
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
     th, td { padding: 10px 9px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .horizon-divider td { border-top: 3px solid #333; }
     th { background-color: #f8fafc; color: var(--text-sub); font-weight: 600; }
 
     .badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; white-space: nowrap; }
@@ -158,9 +159,9 @@
     .badge-icon  { background: #f3e5f5; color: #7b1fa2; }
     .badge-ecmwf { background: #e8f5e9; color: #388e3c; }
     .badge-winner { background: #e8f8f0; color: #27ae60; }
+    .cell-winner { background: #fff8e1; border-radius: 6px; font-weight: 600; }
     .badge-loser  { background: #fdedec; color: #c0392b; }
     .badge-muted  { background: #f1f2f3; color: #95a5a6; }
-    .badge-best-param { background: #d4edda; color: #155724; font-size: 0.75rem; margin-left: 4px; padding: 2px 5px; border-radius: 4px; font-weight: bold; }
 
     /* Filtros */
     .filters { display: flex; gap: 20px; margin-bottom: 6px; flex-wrap: wrap; align-items: flex-end; }
@@ -825,15 +826,15 @@ function statsModelo(list, modelo, paramKey) {
     return { mae: media(errs), bias: media(biases), n: errs.filter(v => v !== null && !isNaN(v)).length };
 }
 
-function fmtDir(mae, bias) {
+function fmtDir(mae, bias, prefix = '') {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${Math.round(bias)}°` : '-';
-    return `${Math.round(mae)}° <small>(${b})</small>`;
+    return `${prefix}${Math.round(mae)}° <small>(${b})</small>`;
 }
-function fmtNum(mae, bias, unidad = '') {
+function fmtNum(mae, bias, unidad = '', prefix = '') {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${bias.toFixed(1)}${unidad}` : '-';
-    return `<div>MAE: ${mae.toFixed(1)}${unidad}</div><div>Bias: ${b}</div>`;
+    return `<div>${prefix}MAE: ${mae.toFixed(1)}${unidad}</div><div>Bias: ${b}</div>`;
 }
 
 /* ---------------------------------------------------------------------
@@ -930,7 +931,7 @@ function renderTablaHorizontes() {
     ['6', '24', '48', '72'].forEach(h => {
         const list = CRUCES[h];
         if (list.length === 0) {
-            html += `<tr><td><b>+${h}h</b></td><td colspan="5" style="text-align:center;">No data</td></tr>`;
+            html += `<tr class="horizon-divider"><td><b>+${h}h</b></td><td colspan="5" style="text-align:center;">No data</td></tr>`;
             return;
         }
         const stats = {};
@@ -948,19 +949,19 @@ function renderTablaHorizontes() {
 
         const maxScore = Math.max(...MODELOS.map(m => stats[m].score).filter(v => v !== null));
 
-        const winTag = (val, minVal) => (val !== null && minVal !== null && val === minVal) ? ' <span class="badge-best-param">🟢 Best</span>' : '';
+        const isWinner = (val, minVal) => val !== null && minVal !== null && val === minVal;
 
         MODELOS.forEach((m, idx) => {
             const s = stats[m];
             const esGanadorGlobal = s.score !== null && maxScore !== null && s.score === maxScore;
 
-            html += `<tr>
+            html += `<tr class="${idx === 0 ? 'horizon-divider' : ''}">
                 ${idx === 0 ? `<td rowspan="${MODELOS.length}"><b>+${h}h</b></td>` : ''}
                 <td><span class="badge ${badgeClase[m]}">${m}</span></td>
-                <td>${fmtNum(s.v.mae, s.v.bias, ' km/h')}${winTag(s.v.mae, minMedia)}</td>
-                <td>${m === 'ECMWF' ? '<i>N/A</i>' : fmtNum(s.r.mae, s.r.bias, ' km/h') + winTag(s.r.mae, minRacha)}</td>
-                <td>${fmtDir(s.d.mae, s.d.bias)}${winTag(s.d.mae, minDir)}</td>
-                <td>${s.score === null ? '-' : '<b>' + s.score.toFixed(1) + ' / 10</b> ' + (esGanadorGlobal ? '<span class="badge badge-winner">🟢 Overall Winner</span>' : '')}</td>
+                <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '')}</td>
+                <td class="${m === 'ECMWF' ? '' : (isWinner(s.r.mae, minRacha) ? 'cell-winner' : '')}">${m === 'ECMWF' ? '<i>N/A</i>' : fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '')}</td>
+                <td class="${isWinner(s.d.mae, minDir) ? 'cell-winner' : ''}">${fmtDir(s.d.mae, s.d.bias, isWinner(s.d.mae, minDir) ? '🥇 ' : '')}</td>
+                <td class="${esGanadorGlobal ? 'cell-winner' : ''}">${s.score === null ? '-' : (esGanadorGlobal ? '🥇 ' : '') + '<b>' + s.score.toFixed(1) + ' / 10</b>'}</td>
             </tr>`;
         });
     });
@@ -1132,7 +1133,7 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
         const fmtCol = (v, r, d, winV, winR, winD) => {
             if (v.mae === null) return '-';
             
-            const winStyle = 'border: 2px solid #e74c3c; border-radius: 4px; padding: 1px 4px; font-weight: bold; color: #c0392b;';
+            const winStyle = 'border: 2px solid #4b994f; border-radius: 4px; padding: 1px 4px; font-weight: bold; color: #4b994f;';
             
             let vHtml = winV ? `<span style="${winStyle}">${v.mae.toFixed(1)}</span>` : `<b>${v.mae.toFixed(1)}</b>`;
             let txt = vHtml;
