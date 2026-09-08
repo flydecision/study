@@ -274,7 +274,7 @@
                     <li><b>2nd place</b> = 2 points</li>
                     <li><b>3rd place (worst)</b> = 3 points</li>
                 </ul>
-                <p>A lower score is better (a perfect score of <b>1.00</b> means the model won every single comparison). The number in parentheses <b>(matches)</b> indicates how many valid comparisons were made to calculate this average. ECMWF is fairly excluded from gust comparisons.</p>
+                <p>A lower score is better (a perfect score of <b>1.00</b> means the model won every single comparison). The number in parentheses <b>(matches)</b> indicates how many valid comparisons were made to calculate this average.</p>
                 <p>This overall ranking already takes into account that AromeHD does not compete in +48h and +72h horizons.</p>
             </div>
         </div>
@@ -311,9 +311,6 @@
                 </p>
                 <p style="margin: 0 0 8px;">
                     ℹ️ AromeHD does not compete in +48h and +72h horizons.
-                </p>
-                <p style="margin: 0 0 8px;">
-                    ℹ️ ECMWF does not compete in gust as it does not record that parameter.
                 </p>
             </div>
         </div>
@@ -375,7 +372,7 @@
                         <th>Samples</th>
                         <th>AromeHD (Avg / Gust / Dir)</th>
                         <th>ICON-EU (Avg / Gust / Dir)</th>
-                        <th>ECMWF (Avg / Dir)</th>
+                        <th>ECMWF (Avg / Gust / Dir)</th>
                         <th>Overall Winner</th>
                     </tr>
                 </thead>
@@ -388,11 +385,7 @@
                     <li><b>40% of score:</b> Average wind speed error.</li>
                     <li><b>30% of score:</b> Maximum gust error.</li>
                     <li><b>30% of score:</b> Wind direction error.</li>
-                </ul>
-                <p style="margin: 8px 0 0;">
-                    Since maximum gust data is not collected for ECMWF, its score is reweighted to 55% average wind and 45% direction so it is not penalized for lacking gust data.
-                </p>
-                 
+                </ul>                 
             </div>
         </div>
     </div>
@@ -510,9 +503,9 @@ function parseCSV(text) {
     const rows = [];
     for (let i = 1; i < logicalLines.length; i++) {
         const values = parseCSVLine(logicalLines[i], ';');
-        if (values.length === headers.length) {
+        if (values.length >= headers.length - 4) {
             const obj = {};
-            headers.forEach((h, idx) => { obj[h] = values[idx]; });
+            headers.forEach((h, idx) => { obj[h] = values[idx] ?? ''; });
             rows.push(obj);
         }
     }
@@ -730,7 +723,7 @@ function procesarDatos(rows) {
                 },
                 ECMWF: {
                     media: parseFloat(r[`${h}h_ecmwf_media`]),
-                    racha: NaN, // ECMWF no da racha
+                    racha: parseFloat(r[`${h}h_ecmwf_racha`]),
                     dir: parseFloat(r[`${h}h_ecmwf_direccion`])
                 }
             };
@@ -873,7 +866,7 @@ function renderEstadoEstudio(rows) {
 
     document.getElementById('stat-fecha-inicio').textContent = fechaInicioFmt;
     document.getElementById('stat-dias-transcurridos').textContent = textoTiempo;
-    document.getElementById('stat-cruces-totales').textContent = totalCruces.toLocaleString();
+    document.getElementById('stat-cruces-totales').textContent = totalCruces;
 }
 
 /* ---------------------------------------------------------------------
@@ -951,15 +944,16 @@ function renderTablaHorizontes() {
 
         const isWinner = (val, minVal) => val !== null && minVal !== null && val === minVal;
 
-        MODELOS.forEach((m, idx) => {
+        const modelosHorizonte = (h === '48' || h === '72') ? MODELOS.filter(m => m !== 'AromeHD') : MODELOS;
+        modelosHorizonte.forEach((m, idx) => {
             const s = stats[m];
             const esGanadorGlobal = s.score !== null && maxScore !== null && s.score === maxScore;
 
             html += `<tr class="${idx === 0 ? 'horizon-divider' : ''}">
-                ${idx === 0 ? `<td rowspan="${MODELOS.length}"><b>+${h}h</b></td>` : ''}
+                ${idx === 0 ? `<td rowspan="${modelosHorizonte.length}"><b>+${h}h</b></td>` : ''}
                 <td><span class="badge ${badgeClase[m]}">${m}</span></td>
                 <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '')}</td>
-                <td class="${m === 'ECMWF' ? '' : (isWinner(s.r.mae, minRacha) ? 'cell-winner' : '')}">${m === 'ECMWF' ? '<i>N/A</i>' : fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '')}</td>
+                <td class="${isWinner(s.r.mae, minRacha) ? 'cell-winner' : ''}">${fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '')}</td>
                 <td class="${isWinner(s.d.mae, minDir) ? 'cell-winner' : ''}">${fmtDir(s.d.mae, s.d.bias, isWinner(s.d.mae, minDir) ? '🥇 ' : '')}</td>
                 <td class="${esGanadorGlobal ? 'cell-winner' : ''}">${s.score === null ? '-' : (esGanadorGlobal ? '🥇 ' : '') + '<b>' + s.score.toFixed(1) + ' / 10</b>'}</td>
             </tr>`;
@@ -1008,7 +1002,7 @@ function renderCharts(list) {
     });
 
     // Sesgo racha por lugar
-    const dsBiasRacha = ['AromeHD', 'ICON-EU'].map(m => ({
+    const dsBiasRacha = MODELOS.map(m => ({
         label: m,
         data: lugares.map(l => { const s = statsModelo(list.filter(it => it.lugar === l), m, 'racha'); return s.bias; }),
         backgroundColor: coloresModelo[m]
@@ -1040,7 +1034,7 @@ function renderCharts(list) {
     });
 
     // Histórico de error de racha por día
-    const dsHistRacha = ['AromeHD', 'ICON-EU'].map(m => {
+    const dsHistRacha = MODELOS.map(m => {
         const color = coloresModelo[m];
         return {
             label: m,
@@ -1089,7 +1083,7 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
         const g = porDespegue[id];
         const sA = { v: statsModelo(g.items, 'AromeHD', 'viento'), r: statsModelo(g.items, 'AromeHD', 'racha'), d: statsModelo(g.items, 'AromeHD', 'dir') };
         const sI = { v: statsModelo(g.items, 'ICON-EU', 'viento'), r: statsModelo(g.items, 'ICON-EU', 'racha'), d: statsModelo(g.items, 'ICON-EU', 'dir') };
-        const sE = { v: statsModelo(g.items, 'ECMWF', 'viento'), d: statsModelo(g.items, 'ECMWF', 'dir') };
+        const sE = { v: statsModelo(g.items, 'ECMWF', 'viento'), r: statsModelo(g.items, 'ECMWF', 'racha'), d: statsModelo(g.items, 'ECMWF', 'dir') };
 
         const valVA = sA.v.mae !== null ? sA.v.mae : Infinity;
         const valVI = sI.v.mae !== null ? sI.v.mae : Infinity;
@@ -1101,9 +1095,11 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
 
         const valRA = sA.r.mae !== null ? sA.r.mae : Infinity;
         const valRI = sI.r.mae !== null ? sI.r.mae : Infinity;
-        const minR = Math.min(valRA, valRI);
+        const valRE = sE.r.mae !== null ? sE.r.mae : Infinity;
+        const minR = Math.min(valRA, valRI, valRE);
         const winR_A = valRA === minR;
         const winR_I = valRI === minR;
+        const winR_E = valRE === minR;
 
         const valDA = sA.d.mae !== null ? sA.d.mae : Infinity;
         const valDI = sI.d.mae !== null ? sI.d.mae : Infinity;
@@ -1115,7 +1111,7 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
 
         const scoreA = calcularNotaGlobal(sA.v.mae, sA.r.mae, sA.d.mae);
         const scoreI = calcularNotaGlobal(sI.v.mae, sI.r.mae, sI.d.mae);
-        const scoreE = calcularNotaGlobal(sE.v.mae, null, sE.d.mae);
+        const scoreE = calcularNotaGlobal(sE.v.mae, sE.r.mae, sE.d.mae);
 
         const candidatos = [
             { name: 'AromeHD', score: scoreA },
@@ -1133,9 +1129,9 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
         const fmtCol = (v, r, d, winV, winR, winD) => {
             if (v.mae === null) return '-';
             
-            const winStyle = 'border: 2px solid #4b994f; border-radius: 4px; padding: 1px 4px; font-weight: bold; color: #4b994f;';
+            const winStyle = 'background: #fff8e1; border-radius: 4px; padding: 1px 4px; font-weight: bold;';
             
-            let vHtml = winV ? `<span style="${winStyle}">${v.mae.toFixed(1)}</span>` : `<b>${v.mae.toFixed(1)}</b>`;
+            let vHtml = winV ? `<span style="${winStyle}">${v.mae.toFixed(1)}</span>` : v.mae.toFixed(1);
             let txt = vHtml;
             
             if (r && r.mae !== null) {
@@ -1167,7 +1163,7 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
             <td style="text-align:center; font-weight:bold;">${totalMuestras}</td>
             <td>${fmtCol(sA.v, sA.r, sA.d, winV_A, winR_A, winD_A)}</td>
             <td>${fmtCol(sI.v, sI.r, sI.d, winV_I, winR_I, winD_I)}</td>
-            <td>${fmtCol(sE.v, null, sE.d, winV_E, false, winD_E)}</td>
+            <td>${fmtCol(sE.v, sE.r, sE.d, winV_E, winR_E, winD_E)}</td>
             <td>${mejor}</td>
         </tr>`;
     });

@@ -341,10 +341,12 @@ function getClosestForecastDataEcmwf($hourlyEcmwf, $targetTs, $altitudDespegue) 
         );
 
         if ($res !== null) {
+            $gustRaw = $hourlyEcmwf['wind_gusts_10m'][$closestIndex] ?? null;
             return [
                 // Formateamos el timestamp a la zona horaria local (Europe/Madrid)
                 'fecha' => date('Y-m-d H:i', $closestTs),
                 'speed' => round($res['speed']),
+                'gusts' => $gustRaw !== null ? round($gustRaw) : null,
                 'dir'   => round($res['dir'])
             ];
         }
@@ -422,7 +424,9 @@ if (!$logExists) {
         // posición, así que el orden aquí no afecta al análisis)
         '6h_pronostico_momento', '6h_arome_media', '6h_arome_racha', '6h_arome_direccion',
         '6h_icon_media', '6h_icon_racha', '6h_icon_direccion',
-        '6h_ecmwf_media', '6h_ecmwf_direccion'
+        '6h_ecmwf_media', '6h_ecmwf_direccion',
+        // Racha ECMWF (añadida después; mismo motivo, va al final)
+        '24h_ecmwf_racha', '48h_ecmwf_racha', '72h_ecmwf_racha', '6h_ecmwf_racha'
     ], ';');
 }
 
@@ -565,7 +569,9 @@ foreach ($mapeos as $map) {
         // +6h (AromeHD + ICON-EU + ECMWF)
         $momento6, $p6['speed'] ?? '', $p6['gusts'] ?? '', $p6['dir'] ?? '',
         $icon6['speed'] ?? '', $icon6['gusts'] ?? '', $icon6['dir'] ?? '',
-        $ec6['speed'] ?? '', $ec6['dir'] ?? ''
+        $ec6['speed'] ?? '', $ec6['dir'] ?? '',
+        // Racha ECMWF (añadida después; va al final para no desalinear el CSV histórico)
+        $ec24['gusts'] ?? '', $ec48['gusts'] ?? '', $ec72['gusts'] ?? '', $ec6['gusts'] ?? ''
     ];
 
     if (fputcsv($logHandle, $row, ';') !== FALSE) {
