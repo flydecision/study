@@ -282,7 +282,7 @@
         <!-- ============ TABLA POR HORIZONTE, MODELO Y PARÁMETROS ============ -->
         <div class="section-card">
             <h2>🏆 Results by Horizon, Model and Parameters:</h2>
-            <div class="section-desc">Cross-table of forecast time horizons (+6h, +24h, +48h, +72h) for each model and analyzed parameters (average wind, maximum wind gust and wind direction). Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and Bias.</div>
+            <div class="section-desc">Cross-table of forecast time horizons (+6h, +24h, +48h, +72h) for each model and analyzed parameters (average wind, maximum wind gust and wind direction). Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and MBE (Mean Bias Error).</div>
             <table>
                 <thead>
                     <tr>
@@ -301,7 +301,7 @@
                     • <b>Mean Absolute Error (MAE):</b> The "magnitude of the error", regardless of whether it is an overestimation or underestimation.
                 </p>
                 <p style="margin: 0 0 8px;">
-                    • <b>Bias:</b> Indicates whether the model tends to predict more or less wind than actual (e.g., -4 km/h means it tends to underestimate, so actual wind will likely be higher).
+                    • <b>MBE (Mean Bias Error):</b> Indicates whether the model tends to predict more or less wind than actual (e.g., -4 km/h means it tends to underestimate, so actual wind will likely be higher).
                 </p>
                 <p style="margin: 0 0 8px;">
                     For all statistical calculations on the <i>Direction</i> parameter, a minimum speed threshold of 8 km/h has been established (slightly higher than the ICAO/METAR standard of 3 knots / 5.5 km/h). The goal is to minimize what is called in meteorological statistics "the noise of calms" (large random direction fluctuations in light winds).
@@ -318,7 +318,7 @@
         <!-- ============ FILTROS + GRÁFICAS + DETALLE ============ -->
         <div class="section-card">
             <h2>🔍 Explore by Takeoff, Horizon, and Data Time</h2>
-            <div class="section-desc">Filter to see bias by location and error evolution day by day. Note: naturally, the +6h horizon only has comparative data for the 9, 11, and 13h data captures.</div>
+            <div class="section-desc">Filter to see MBE by location and error evolution day by day. Note: naturally, the +6h horizon only has comparative data for the 9, 11, and 13h data captures.</div>
 
             <div class="filters">
                 <div>
@@ -350,15 +350,15 @@
             </div>
 
             <div style="background: #f0f8ff; border: 1px solid #bcdff1; padding: 15px; border-radius: 8px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="margin-bottom: 10px;">🧮 Systematic Bias Correction & Calibration for Average Wind using Ordinary Least Squares (OLS) Linear Regression</h3>
+                <h3 style="margin-bottom: 10px;">🧮 Systematic Bias Correction & Calibration for Average Wind and Gust using Ordinary Least Squares (OLS) Linear Regression</h3>
                 <div id="formula-correccion" style="font-family: monospace; font-size: 1.1rem; font-weight: bold; color: #2c3e50;">
                     Select a specific takeoff and time to calculate the formula...
                 </div>
                 <div id="formula-detalle" style="color: #7f8c8d; margin-top: 5px;"></div>
             </div>
 
-            <div class="chart-container"><h3>Average wind bias by takeoff</h3><canvas id="biasChart"></canvas></div>
-            <div class="chart-container"><h3>Gust bias by takeoff</h3><canvas id="biasRachaChart"></canvas></div>
+            <div class="chart-container"><h3>Average wind MBE by takeoff</h3><canvas id="biasChart"></canvas></div>
+            <div class="chart-container"><h3>Gust MBE by takeoff</h3><canvas id="biasRachaChart"></canvas></div>
             <div class="chart-container"><h3>Average wind error evolution (by day)</h3><canvas id="historyChart"></canvas></div>
             <div class="chart-container"><h3>Maximum gust error evolution (by day)</h3><canvas id="historyRachaChart"></canvas></div>
             <div class="chart-container"><h3>Direction error evolution (by day)</h3><canvas id="historyDirChart"></canvas></div>
@@ -998,7 +998,7 @@ function renderCharts(list) {
     charts.bias = new Chart(document.getElementById('biasChart'), {
         type: 'bar',
         data: { labels: lugares, datasets: dsBiasViento },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Bias (km/h)' } } } }
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'MBE (km/h)' } } } }
     });
 
     // Sesgo racha por lugar
@@ -1011,7 +1011,7 @@ function renderCharts(list) {
     charts.biasRacha = new Chart(document.getElementById('biasRachaChart'), {
         type: 'bar',
         data: { labels: lugares, datasets: dsBiasRacha },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'Bias (km/h)' } } } }
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { title: { display: true, text: 'MBE (km/h)' } } } }
     });
 
     // Histórico de error de viento por día
@@ -1177,19 +1177,38 @@ function renderFormulaCorreccion(list) {
     const regArome = calcRegresion(list, 'AromeHD', 'viento');
     const regIcon = calcRegresion(list, 'ICON-EU', 'viento');
     const regEcmwf = calcRegresion(list, 'ECMWF', 'viento');
+
+    const regAromeRacha = calcRegresion(list, 'AromeHD', 'racha');
+    const regIconRacha = calcRegresion(list, 'ICON-EU', 'racha');
+    const regEcmwfRacha = calcRegresion(list, 'ECMWF', 'racha');
     
-    let html = '';
+    let htmlViento = '';
+    let htmlRacha = '';
     
     // Concatenamos la fórmula y, en un span gris justo después, ponemos el R² y la n
     if (regArome.n >= 5) {
-        html += `AromeHD: <span style="color: #1976d2;">Actual = (${regArome.m.toFixed(2)} * Forecast) + ${regArome.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regArome.r2*100).toFixed(0)}%, n=${regArome.n})</span><br>`;
+        htmlViento += `AromeHD: <span style="color: #1976d2;">Actual = (${regArome.m.toFixed(2)} * Forecast) + ${regArome.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regArome.r2*100).toFixed(0)}%, n=${regArome.n})</span><br>`;
     }
     if (regIcon.n >= 5) {
-        html += `ICON-EU: <span style="color: #7b1fa2;">Actual = (${regIcon.m.toFixed(2)} * Forecast) + ${regIcon.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regIcon.r2*100).toFixed(0)}%, n=${regIcon.n})</span><br>`;
+        htmlViento += `ICON-EU: <span style="color: #7b1fa2;">Actual = (${regIcon.m.toFixed(2)} * Forecast) + ${regIcon.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regIcon.r2*100).toFixed(0)}%, n=${regIcon.n})</span><br>`;
     }
     if (regEcmwf.n >= 5) {
-        html += `ECMWF: <span style="color: #388e3c;">Actual = (${regEcmwf.m.toFixed(2)} * Forecast) + ${regEcmwf.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regEcmwf.r2*100).toFixed(0)}%, n=${regEcmwf.n})</span>`;
+        htmlViento += `ECMWF: <span style="color: #388e3c;">Actual = (${regEcmwf.m.toFixed(2)} * Forecast) + ${regEcmwf.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regEcmwf.r2*100).toFixed(0)}%, n=${regEcmwf.n})</span>`;
     }
+
+    if (regAromeRacha.n >= 5) {
+        htmlRacha += `AromeHD: <span style="color: #1976d2;">Actual = (${regAromeRacha.m.toFixed(2)} * Forecast) + ${regAromeRacha.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regAromeRacha.r2*100).toFixed(0)}%, n=${regAromeRacha.n})</span><br>`;
+    }
+    if (regIconRacha.n >= 5) {
+        htmlRacha += `ICON-EU: <span style="color: #7b1fa2;">Actual = (${regIconRacha.m.toFixed(2)} * Forecast) + ${regIconRacha.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regIconRacha.r2*100).toFixed(0)}%, n=${regIconRacha.n})</span><br>`;
+    }
+    if (regEcmwfRacha.n >= 5) {
+        htmlRacha += `ECMWF: <span style="color: #388e3c;">Actual = (${regEcmwfRacha.m.toFixed(2)} * Forecast) + ${regEcmwfRacha.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regEcmwfRacha.r2*100).toFixed(0)}%, n=${regEcmwfRacha.n})</span>`;
+    }
+
+    let html = '';
+    if (htmlViento !== '') html += `<u>Average Wind</u><br>${htmlViento}`;
+    if (htmlRacha !== '') html += `${htmlViento !== '' ? '<br><br>' : ''}<u>Gust</u><br>${htmlRacha}`;
     
     if (html === '') {
         divFormula.innerHTML = "At least 5 samples are needed with current filters to calculate the formula.";
