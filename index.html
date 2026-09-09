@@ -298,10 +298,13 @@
             <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
                 <b>ℹ️ Quick Glossary:</b>
                 <p style="margin: 8px 0 4px;">
-                    • <b>Mean Absolute Error (MAE):</b> The "magnitude of the error", regardless of whether it is an overestimation or underestimation.
+                    • <b>MAE (Mean Absolute Error):</b> The "magnitude of the error", regardless of whether it is an overestimation or underestimation.
                 </p>
                 <p style="margin: 0 0 8px;">
                     • <b>MBE (Mean Bias Error):</b> Indicates whether the model tends to predict more or less wind than actual (e.g., -4 km/h means it tends to underestimate, so actual wind will likely be higher).
+                </p>
+                <p style="margin: 0 0 8px;">
+                    • <b>RMSE (Root Mean Square Error):</b> Similar to MAE, but penalizes large errors more heavily. When RMSE is noticeably higher than MAE, it means the model is usually reasonably accurate but occasionally makes large mistakes — rather than being consistently off by a similar amount every time.
                 </p>
                 <p style="margin: 0 0 8px;">
                     For all statistical calculations on the <i>Direction</i> parameter, a minimum speed threshold of 8 km/h has been established (slightly higher than the ICAO/METAR standard of 3 knots / 5.5 km/h). The goal is to minimize what is called in meteorological statistics "the noise of calms" (large random direction fluctuations in light winds).
@@ -816,18 +819,22 @@ function statsModelo(list, modelo, paramKey) {
     const errKey = PARAMS[paramKey], biasKey = PARAMS_BIAS[paramKey];
     const errs = list.map(it => it.modelos[modelo][errKey]);
     const biases = list.map(it => it.modelos[modelo][biasKey]);
-    return { mae: media(errs), bias: media(biases), n: errs.filter(v => v !== null && !isNaN(v)).length };
+    const validErrs = errs.filter(v => v !== null && !isNaN(v));
+    const rmse = validErrs.length > 0 ? Math.sqrt(validErrs.reduce((s, v) => s + v * v, 0) / validErrs.length) : null;
+    return { mae: media(errs), bias: media(biases), rmse: rmse, n: validErrs.length };
 }
 
-function fmtDir(mae, bias, prefix = '') {
+function fmtDir(mae, bias, prefix = '', rmse = null) {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${Math.round(bias)}°` : '-';
-    return `${prefix}${Math.round(mae)}° <small>(${b})</small>`;
+    const r = rmse !== null ? ` <small>RMSE: ${Math.round(rmse)}°</small>` : '';
+    return `${prefix}${Math.round(mae)}° <small>(${b})</small>${r}`;
 }
-function fmtNum(mae, bias, unidad = '', prefix = '') {
+function fmtNum(mae, bias, unidad = '', prefix = '', rmse = null) {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${bias.toFixed(1)}${unidad}` : '-';
-    return `<div>${prefix}MAE: ${mae.toFixed(1)}${unidad}</div><div>Bias: ${b}</div>`;
+    const r = rmse !== null ? `<div style="font-size:0.85rem;">RMSE: ${rmse.toFixed(1)}${unidad}</div>` : '';
+    return `<div>${prefix}MAE: ${mae.toFixed(1)}${unidad}</div><div>MBE: ${b}</div>${r}`;
 }
 
 /* ---------------------------------------------------------------------
@@ -952,10 +959,10 @@ function renderTablaHorizontes() {
             html += `<tr class="${idx === 0 ? 'horizon-divider' : ''}">
                 ${idx === 0 ? `<td rowspan="${modelosHorizonte.length}"><b>+${h}h</b></td>` : ''}
                 <td><span class="badge ${badgeClase[m]}">${m}</span></td>
-                <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '')}</td>
-                <td class="${isWinner(s.r.mae, minRacha) ? 'cell-winner' : ''}">${fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '')}</td>
-                <td class="${isWinner(s.d.mae, minDir) ? 'cell-winner' : ''}">${fmtDir(s.d.mae, s.d.bias, isWinner(s.d.mae, minDir) ? '🥇 ' : '')}</td>
-                <td class="${esGanadorGlobal ? 'cell-winner' : ''}">${s.score === null ? '-' : (esGanadorGlobal ? '🥇 ' : '') + '<b>' + s.score.toFixed(1) + ' / 10</b>'}</td>
+                <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '', s.v.rmse)}</td>
+                <td class="${isWinner(s.r.mae, minRacha) ? 'cell-winner' : ''}">${fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '', s.r.rmse)}</td>
+                <td class="${isWinner(s.d.mae, minDir) ? 'cell-winner' : ''}">${fmtDir(s.d.mae, s.d.bias, isWinner(s.d.mae, minDir) ? '🥇 ' : '', s.d.rmse)}</td>
+                <td class="${esGanadorGlobal ? 'cell-winner' : ''}">${s.score === null ? '-' : (esGanadorGlobal ? '🥇 ' : '') + s.score.toFixed(1) + ' / 10'}</td>
             </tr>`;
         });
     });

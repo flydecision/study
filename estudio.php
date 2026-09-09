@@ -75,7 +75,10 @@ function downloadUrlWithTimeout($url, $timeoutSeconds = 8) {
 // flydecision.com solo añade un segundo proceso PHP colgado hasta 10s
 // esperando a que el propio servidor se responda a sí mismo.
 function obtenerJsonMeteoLocal($nombreArchivo) {
-    $rutaLocal = __DIR__ . '/' . $nombreArchivo;
+    // estudio.php vive en /estudio, pero meteo-datos.json, estudio_meteo-datos-icon.json
+    // y meteo-datos-ecmwf.json se generan en la raíz del sitio (un nivel por encima) —
+    // por eso apuntamos a dirname(__DIR__), no a __DIR__ directamente.
+    $rutaLocal = dirname(__DIR__) . '/' . $nombreArchivo;
     if (!file_exists($rutaLocal)) return null;
     $raw = @file_get_contents($rutaLocal);
     if (!$raw) return null;
@@ -88,7 +91,21 @@ $dataIcon  = obtenerJsonMeteoLocal('estudio_meteo-datos-icon.json');
 $dataEcmwf = obtenerJsonMeteoLocal('meteo-datos-ecmwf.json');
 
 if (!$dataMeteo) {
-    die("Error: No se pudieron cargar los pronósticos de meteo-datos.json.\n");
+    $rutaDiag = __DIR__ . '/meteo-datos.json';
+    $existe = file_exists($rutaDiag);
+    $tam = $existe ? filesize($rutaDiag) : null;
+    $mtime = $existe ? date('Y-m-d H:i:s', filemtime($rutaDiag)) : null;
+    " | __DIR__=" . __DIR__ .
+    " | contenido_carpeta=" . $contenidoCarpeta .
+    $inicio = $existe ? substr(@file_get_contents($rutaDiag, false, null, 0, 200), 0, 200) : null;
+    $contenidoCarpeta = implode(', ', array_diff(scandir(__DIR__), ['.', '..']));
+    die("Error: No se pudieron cargar los pronósticos de meteo-datos.json.\n" .
+        "Diagnóstico: existe=" . ($existe ? 'si' : 'no') .
+        " | tamaño=" . ($tam ?? 'n/a') .
+        " | mtime=" . ($mtime ?? 'n/a') .
+        " | memory_limit=" . ini_get('memory_limit') .
+        " | memoria_usada_pico=" . round(memory_get_peak_usage(true) / 1024 / 1024, 1) . "MB" .
+        " | primeros200chars=" . var_export($inicio, true) . "\n");
 }
 
 // Extrae el valor del campo ID de un despegue, sin importar mayúsculas/minúsculas
