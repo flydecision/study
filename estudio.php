@@ -474,7 +474,7 @@ foreach ($mapeos as $map) {
     $dataBalizas = null;
     if (!empty($archivoBalizas)) {
         if (!isset($cacheBalizasJSON[$archivoBalizas])) {
-            $rutaLocalBaliza = __DIR__ . '/' . $archivoBalizas;
+            $rutaLocalBaliza = dirname(__DIR__) . '/' . $archivoBalizas;
             if (file_exists($rutaLocalBaliza)) {
                 $jsonBalizaRaw = @file_get_contents($rutaLocalBaliza);
             } elseif (strpos($archivoBalizas, 'http') === 0 && strpos($archivoBalizas, 'flydecision.com') === false) {
