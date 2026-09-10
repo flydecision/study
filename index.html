@@ -398,6 +398,7 @@ document.addEventListener('DOMContentLoaded', cargarEstudio);
 
 let CRUCES = { '6': [], '24': [], '48': [], '72': [] };
 let LINKS_DESPEGUES = {}; 
+let ORIENTACIONES_DESPEGUES = {}; // 🧭 Guarda las orientaciones de cada despegue
 let charts = { bias: null, biasRacha: null, history: null, historyRacha: null, historyDir: null };
 
 const coloresModelo = {
@@ -531,10 +532,32 @@ function parseMapCSV(text) {
             headers.forEach((h, idx) => { row[h.trim()] = values[idx].trim(); });
             if (row.id_despegue) {
                 map[row.id_despegue] = row.link || '#';
+                // 🧭 Guardamos las orientaciones asociadas al ID de despegue
+                ORIENTACIONES_DESPEGUES[row.id_despegue] = row.orientaciones || '';
             }
         }
     }
     return map;
+}
+
+// Determines wind regime: Headwind (<=45°), Crosswind (46°-90°) or Tailwind (>90°)
+function obtenerRegimenViento(dirPred, orientacionesStr) {
+    if (dirPred === null || isNaN(dirPred) || !orientacionesStr) return null;
+    
+    const oris = orientacionesStr.split(',')
+        .map(o => parseFloat(o.trim()))
+        .filter(o => !isNaN(o));
+    if (oris.length === 0) return null;
+
+    let minDelta = 180;
+    oris.forEach(ori => {
+        const d = angularDiff(dirPred, ori);
+        if (d !== null && d < minDelta) minDelta = d;
+    });
+
+    if (minDelta <= 45) return 'headwind';
+    if (minDelta <= 90) return 'crosswind';
+    return 'tailwind';
 }
 
 // Normaliza cualquier fecha a clave YYYY-MM-DD-HH, redondeando al tramo horario más cercano
@@ -1180,50 +1203,82 @@ function renderFormulaCorreccion(list) {
     const divFormula = document.getElementById('formula-correccion');
     const divDetalle = document.getElementById('formula-detalle');
     
-    const regArome = calcRegresion(list, 'AromeHD', 'viento');
-    const regIcon = calcRegresion(list, 'ICON-EU', 'viento');
-    const regEcmwf = calcRegresion(list, 'ECMWF', 'viento');
+    const lugarSel = document.getElementById('lugarSelect').value;
+    const esGlobal = (lugarSel === 'todos');
 
-    const regAromeRacha = calcRegresion(list, 'AromeHD', 'racha');
-    const regIconRacha = calcRegresion(list, 'ICON-EU', 'racha');
-    const regEcmwfRacha = calcRegresion(list, 'ECMWF', 'racha');
-    
-    let htmlViento = '';
-    let htmlRacha = '';
-    
-    // Concatenamos la fórmula y, en un span gris justo después, ponemos el R² y la n
-    if (regArome.n >= 5) {
-        htmlViento += `AromeHD: <span style="color: #1976d2;">Actual = (${regArome.m.toFixed(2)} * Forecast) + ${regArome.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regArome.r2*100).toFixed(0)}%, n=${regArome.n})</span><br>`;
-    }
-    if (regIcon.n >= 5) {
-        htmlViento += `ICON-EU: <span style="color: #7b1fa2;">Actual = (${regIcon.m.toFixed(2)} * Forecast) + ${regIcon.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regIcon.r2*100).toFixed(0)}%, n=${regIcon.n})</span><br>`;
-    }
-    if (regEcmwf.n >= 5) {
-        htmlViento += `ECMWF: <span style="color: #388e3c;">Actual = (${regEcmwf.m.toFixed(2)} * Forecast) + ${regEcmwf.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regEcmwf.r2*100).toFixed(0)}%, n=${regEcmwf.n})</span>`;
+    const regimInfo = {
+        headwind:  { label: '🟢 Headwind (Δθ ≤ 45°)', desc: 'Wind blowing onto takeoff (optimal slope / thermal lift)' },
+        crosswind: { label: '🟡 Crosswind (45° < Δθ ≤ 90°)', desc: 'Lateral wind component relative to takeoff' },
+        tailwind:  { label: '🔴 Tailwind (Δθ > 90°)', desc: 'Lee side wind / rotors behind takeoff' }
+    };
+
+    const colores = { AromeHD: '#1976d2', 'ICON-EU': '#7b1fa2', ECMWF: '#388e3c' };
+
+    function renderRegimenes(paramKey) {
+        let bloqueHtml = '';
+
+        ['headwind', 'crosswind', 'tailwind'].forEach(reg => {
+            let lineasModelo = '';
+
+            MODELOS.forEach(m => {
+                // Filter samples where the model's forecasted direction matches this regime
+                const subLista = list.filter(item => {
+                    const oriStr = ORIENTACIONES_DESPEGUES[item.idDespegue] || '';
+                    const dir = item.modelos[m].dirPred;
+                    return obtenerRegimenViento(dir, oriStr) === reg;
+                });
+
+                const r = calcRegresion(subLista, m, paramKey);
+
+                if (r.n >= 5) {
+                    const signoB = r.b >= 0 ? `+ ${r.b.toFixed(1)}` : `- ${Math.abs(r.b).toFixed(1)}`;
+                    // const fiabilidad = r.r2 >= 0.6 ? '🟢' : (r.r2 >= 0.35 ? '🟡' : '🔴');
+                    const fiabilidad = r.r2 >= 0.6 ? '' : (r.r2 >= 0.35 ? '' : '');
+                    lineasModelo += `&nbsp;&nbsp;• <b>${m}:</b> <span style="color: ${colores[m]};">Actual = (${r.m.toFixed(2)} × Forecast) ${signoB}</span> ` +
+                                    `<span style="color: #7f8c8d; font-size: 0.85rem;">[R²=${(r.r2*100).toFixed(0)}%, n=${r.n}] ${fiabilidad}</span><br>`;
+                } else if (r.n > 0) {
+                    lineasModelo += `&nbsp;&nbsp;• <b>${m}:</b> <span style="color: #95a5a6; font-size: 0.85rem;">Insufficient samples (n=${r.n})</span><br>`;
+                }
+            });
+
+            if (lineasModelo !== '') {
+                bloqueHtml += `<div style="margin-bottom: 8px;">
+                    <span style="font-size: 0.95rem; font-weight: 700;">${regimInfo[reg].label}</span>
+                    <small style="color: #7f8c8d; display: block; margin-bottom: 2px;">${regimInfo[reg].desc}</small>
+                    ${lineasModelo}
+                </div>`;
+            }
+        });
+
+        return bloqueHtml;
     }
 
-    if (regAromeRacha.n >= 5) {
-        htmlRacha += `AromeHD: <span style="color: #1976d2;">Actual = (${regAromeRacha.m.toFixed(2)} * Forecast) + ${regAromeRacha.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regAromeRacha.r2*100).toFixed(0)}%, n=${regAromeRacha.n})</span><br>`;
-    }
-    if (regIconRacha.n >= 5) {
-        htmlRacha += `ICON-EU: <span style="color: #7b1fa2;">Actual = (${regIconRacha.m.toFixed(2)} * Forecast) + ${regIconRacha.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regIconRacha.r2*100).toFixed(0)}%, n=${regIconRacha.n})</span><br>`;
-    }
-    if (regEcmwfRacha.n >= 5) {
-        htmlRacha += `ECMWF: <span style="color: #388e3c;">Actual = (${regEcmwfRacha.m.toFixed(2)} * Forecast) + ${regEcmwfRacha.b.toFixed(1)}</span> <span style="color: #7f8c8d; font-size: 0.9rem;">(R²=${(regEcmwfRacha.r2*100).toFixed(0)}%, n=${regEcmwfRacha.n})</span>`;
-    }
+    const htmlViento = renderRegimenes('viento');
+    const htmlRacha  = renderRegimenes('racha');
 
-    let html = '';
-    if (htmlViento !== '') html += `<u>Average Wind</u><br>${htmlViento}`;
-    if (htmlRacha !== '') html += `${htmlViento !== '' ? '<br><br>' : ''}<u>Gust</u><br>${htmlRacha}`;
-    
-    if (html === '') {
-        divFormula.innerHTML = "At least 5 samples are needed with current filters to calculate the formula.";
+    if (!htmlViento && !htmlRacha) {
+        divFormula.innerHTML = "Not enough samples with valid orientation data for the current filters.";
         divDetalle.innerHTML = "";
-    } else {
-        divFormula.innerHTML = html;
-        // Dejamos solo la nota explicativa abajo
-        divDetalle.innerHTML = "* R² (Coefficient of Determination) indicates the formula reliability with current sample size. If low, the model is chaotic and cannot be corrected with this system.";
+        return;
     }
+
+    const tituloOrigen = esGlobal 
+        ? "<b>🌐 18 GLOBAL FORMULAS MATRIX</b><br><small style='font-weight:normal; color:#555;'>Calculated across all takeoffs and weather stations based on the wind direction incidence at the takeoff.</small><br><br>"
+        : `<b>📍 SPECIFIC FORMULAS FOR: ${lugarSel}</b><br><br>`;
+
+    divFormula.innerHTML = tituloOrigen +
+        `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+            <div style="background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #d0e1fd;">
+                <h4 style="margin: 0 0 10px 0; color: #1a252f; border-bottom: 2px solid #3498db; padding-bottom: 4px;">💨 Average Wind</h4>
+                ${htmlViento || '<span style="color:#95a5a6;">No data</span>'}
+            </div>
+            <div style="background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #d0e1fd;">
+                <h4 style="margin: 0 0 10px 0; color: #1a252f; border-bottom: 2px solid #e67e22; padding-bottom: 4px;">💨 Maximum Gust</h4>
+                ${htmlRacha || '<span style="color:#95a5a6;">No data</span>'}
+            </div>
+        </div>`;
+
+    divDetalle.innerHTML = "* R² (Coefficient of Determination) indicates the formula reliability with current sample size. If low, the model is more chaotic and cannot be credibly corrected with this system.";
 }
 </script>
 </body>
