@@ -47,7 +47,71 @@
     .btn-reload:hover { background: #2980b9; }
 
     .notice { background: #fff8e1; border-left: 4px solid #f39c12; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
-    .loading { text-align: center; font-size: 1.1rem; color: var(--text-sub); padding: 60px 20px; }
+    /* --- DESPUÉS: Overlay de carga a pantalla completa --- */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.45); /* Oscurece el fondo */
+        backdrop-filter: blur(5px);          /* Efecto cristal / desenfoque */
+        -webkit-backdrop-filter: blur(5px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+    }
+
+    .loading-card {
+        background: #ffffff;
+        padding: 32px 36px;
+        border-radius: 16px;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        max-width: 88vw;
+        width: 360px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        animation: fadeInLoading 0.2s ease-out;
+    }
+
+    @keyframes fadeInLoading {
+        from { opacity: 0; transform: scale(0.92); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Spinner circular animado */
+    .loading-spinner {
+        width: 44px;
+        height: 44px;
+        border: 4px solid #e2e8f0;
+        border-top: 4px solid var(--primary);
+        border-radius: 50%;
+        animation: spinLoading 0.85s linear infinite;
+        margin-bottom: 4px;
+    }
+
+    @keyframes spinLoading {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .loading-subtitle {
+        font-size: 0.85rem;
+        color: var(--text-sub);
+        margin: 0;
+        line-height: 1.4;
+    }
 
     /* ---- Bloque Estado del Estudio ---- */
     .study-summary-box {
@@ -227,7 +291,13 @@
         </div>
     </header>
 
-    <div id="loading" class="loading">Loading and matching estudio.csv…</div>
+    <div id="loading" class="loading-overlay">
+        <div class="loading-card">
+            <div class="loading-spinner"></div>
+            <h3 class="loading-title">Loading Data...</h3>
+            <p class="loading-subtitle">Analyzing weather forecasts and actual data collected in estudio.csv</p>
+        </div>
+    </div>
     <div id="aviso-espera" class="notice" style="display:none;">
         ⏳ <b>Accumulating data:</b> there are not enough validated matches (real vs. forecast) yet to display the study. Please check back when 24-72h have passed since the first data captures.
     </div>
@@ -352,7 +422,7 @@
             </div>
 
             <div style="background: #f0f8ff; border: 1px solid #bcdff1; padding: 15px; border-radius: 8px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="margin-bottom: 10px;">🧮 Systematic Bias Correction & Calibration for Average Wind and Gust using Ordinary Least Squares (OLS) Linear Regression</h3>
+                <h3 style="margin-bottom: 10px;">🧮 Smart Statistical Calibration (MOS) for Average Wind and Gust using Ordinary Least Squares (OLS) Linear Regression based on wind incidence</h3>
                 <div id="formula-correccion" style="font-family: monospace; font-size: 1.1rem; font-weight: bold; color: #2c3e50;">
                     Select a specific takeoff and time to calculate the formula...
                 </div>
@@ -412,9 +482,11 @@ const badgeClase = { AromeHD: 'badge-arome', 'ICON-EU': 'badge-icon', ECMWF: 'ba
  * CARGA Y PARSEO
  * ------------------------------------------------------------------- */
 async function cargarEstudio() {
-    document.getElementById('loading').style.display = 'block';
+    // 1. Usar 'flex' para centrar el overlay en pantalla completa
+    document.getElementById('loading').style.display = 'flex';
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('aviso-espera').style.display = 'none';
+    
     try {
         // 1. Cargamos el archivo principal (OBLIGATORIO)
         const response = await fetch('estudio.csv?t=' + Date.now());
@@ -463,8 +535,16 @@ async function cargarEstudio() {
         document.getElementById('dashboard').style.display = 'block';
     } catch (err) {
         console.error(err);
-        document.getElementById('loading').innerHTML =
-            `<span style="color:#c0392b;">Error loading estudio.csv: ${err.message}</span>`;
+        // Si hay un error, lo muestra elegantemente dentro de la tarjeta con botón de reintento
+        const card = document.querySelector('.loading-card');
+        if (card) {
+            card.innerHTML = `
+                <div style="font-size: 2.2rem;">❌</div>
+                <h3 class="loading-title" style="color: #c0392b;">Error loading data</h3>
+                <p class="loading-subtitle">${err.message}</p>
+                <button class="btn-reload" onclick="location.reload()" style="margin-top: 10px;">Retry</button>
+            `;
+        }
     }
 }
 
@@ -846,17 +926,24 @@ function statsModelo(list, modelo, paramKey) {
     return { mae: media(errs), bias: media(biases), rmse: rmse, n: validErrs.length };
 }
 
-function fmtDir(mae, bias, prefix = '', rmse = null) {
+function fmtDir(mae, bias, prefix = '', rmse = null, n = null) {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${Math.round(bias)}°` : '-';
     const r = rmse !== null ? ` <small>RMSE: ${Math.round(rmse)}°</small>` : '';
-    return `${prefix}${Math.round(mae)}° <small>(${b})</small>${r}`;
+    const nHtml = (n !== null && n !== undefined) 
+        ? `<div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">(n = ${n})</div>` 
+        : '';
+    return `<div>${prefix}${Math.round(mae)}° <small>(${b})</small>${r}</div>${nHtml}`;
 }
-function fmtNum(mae, bias, unidad = '', prefix = '', rmse = null) {
+
+function fmtNum(mae, bias, unidad = '', prefix = '', rmse = null, n = null) {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${bias.toFixed(1)}${unidad}` : '-';
     const r = rmse !== null ? `<div style="font-size:0.85rem;">RMSE: ${rmse.toFixed(1)}${unidad}</div>` : '';
-    return `<div>${prefix}MAE: ${mae.toFixed(1)}${unidad}</div><div>MBE: ${b}</div>${r}`;
+    const nHtml = (n !== null && n !== undefined) 
+        ? `<div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">(n = ${n})</div>` 
+        : '';
+    return `<div>${prefix}MAE: ${mae.toFixed(1)}${unidad}</div><div>MBE: ${b}</div>${r}${nHtml}`;
 }
 
 /* ---------------------------------------------------------------------
@@ -981,9 +1068,9 @@ function renderTablaHorizontes() {
             html += `<tr class="${idx === 0 ? 'horizon-divider' : ''}">
                 ${idx === 0 ? `<td rowspan="${modelosHorizonte.length}"><b>+${h}h</b></td>` : ''}
                 <td><span class="badge ${badgeClase[m]}">${m}</span></td>
-                <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '', s.v.rmse)}</td>
-                <td class="${isWinner(s.r.mae, minRacha) ? 'cell-winner' : ''}">${fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '', s.r.rmse)}</td>
-                <td class="${isWinner(s.d.mae, minDir) ? 'cell-winner' : ''}">${fmtDir(s.d.mae, s.d.bias, isWinner(s.d.mae, minDir) ? '🥇 ' : '', s.d.rmse)}</td>
+                <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '', s.v.rmse, s.v.n)}</td>
+                <td class="${isWinner(s.r.mae, minRacha) ? 'cell-winner' : ''}">${fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '', s.r.rmse, s.r.n)}</td>
+                <td class="${isWinner(s.d.mae, minDir) ? 'cell-winner' : ''}">${fmtDir(s.d.mae, s.d.bias, isWinner(s.d.mae, minDir) ? '🥇 ' : '', s.d.rmse, s.d.n)}</td>
                 <td class="${esGanadorGlobal ? 'cell-winner' : ''}">${s.score === null ? '-' : (esGanadorGlobal ? '🥇 ' : '') + s.score.toFixed(1) + ' / 10'}</td>
             </tr>`;
         });
@@ -1207,18 +1294,16 @@ function renderFormulaCorreccion(list) {
     const esGlobal = (lugarSel === 'todos');
 
     const regimInfo = {
-        headwind:  { label: '🟢 Headwind (Δθ ≤ 45°)', desc: 'Wind blowing onto takeoff (optimal slope / thermal lift)' },
-        crosswind: { label: '🟡 Crosswind (45° < Δθ ≤ 90°)', desc: 'Lateral wind component relative to takeoff' },
-        tailwind:  { label: '🔴 Tailwind (Δθ > 90°)', desc: 'Lee side wind / rotors behind takeoff' }
+        headwind:  { label: '🟢 Headwind', angulo: 'Δθ ≤ 45°', desc: 'Wind blowing onto takeoff (optimal slope / thermal lift)' },
+        crosswind: { label: '🟡 Crosswind', angulo: '45° < Δθ ≤ 90°', desc: 'Lateral wind component relative to takeoff' },
+        tailwind:  { label: '🔴 Tailwind', angulo: 'Δθ > 90°', desc: 'Lee side wind / rotors behind takeoff' }
     };
-
-    const colores = { AromeHD: '#1976d2', 'ICON-EU': '#7b1fa2', ECMWF: '#388e3c' };
 
     function renderRegimenes(paramKey) {
         let bloqueHtml = '';
 
         ['headwind', 'crosswind', 'tailwind'].forEach(reg => {
-            let lineasModelo = '';
+            let filasTabla = '';
 
             MODELOS.forEach(m => {
                 // Filter samples where the model's forecasted direction matches this regime
@@ -1228,25 +1313,73 @@ function renderFormulaCorreccion(list) {
                     return obtenerRegimenViento(dir, oriStr) === reg;
                 });
 
-                const r = calcRegresion(subLista, m, paramKey);
+                let r;
+                if (paramKey === 'racha') {
+                    // 🛡️ CORRECCIÓN SEGURA DE RACHAS: Fijamos m = 1.00 y calculamos el sesgo puro (Offset)
+                    const puntosRacha = subLista.map(it => {
+                        const pred = it.modelos[m].rachaPred;
+                        const real = it.real.racha;
+                        return (pred !== null && !isNaN(pred) && real !== null && !isNaN(real)) ? { x: pred, y: real } : null;
+                    }).filter(Boolean);
+
+                    if (puntosRacha.length >= 5) {
+                        const n = puntosRacha.length;
+                        const sumX = puntosRacha.reduce((s, p) => s + p.x, 0);
+                        const sumY = puntosRacha.reduce((s, p) => s + p.y, 0);
+                        const offset = (sumY / n) - (sumX / n);
+                        
+                        r = { m: 1.00, b: offset, r2: calcRegresion(subLista, m, paramKey).r2, n: n };
+                    } else {
+                        r = { m: 1.00, b: 0, r2: 0, n: puntosRacha.length };
+                    }
+                } else {
+                    // Viento medio: regresión OLS estándar
+                    r = calcRegresion(subLista, m, paramKey);
+                }
 
                 if (r.n >= 5) {
                     const signoB = r.b >= 0 ? `+ ${r.b.toFixed(1)}` : `- ${Math.abs(r.b).toFixed(1)}`;
-                    // const fiabilidad = r.r2 >= 0.6 ? '🟢' : (r.r2 >= 0.35 ? '🟡' : '🔴');
-                    const fiabilidad = r.r2 >= 0.6 ? '' : (r.r2 >= 0.35 ? '' : '');
-                    lineasModelo += `&nbsp;&nbsp;• <b>${m}:</b> <span style="color: ${colores[m]};">Actual = (${r.m.toFixed(2)} × Forecast) ${signoB}</span> ` +
-                                    `<span style="color: #7f8c8d; font-size: 0.85rem;">[R²=${(r.r2*100).toFixed(0)}%, n=${r.n}] ${fiabilidad}</span><br>`;
+                    filasTabla += `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 4px 6px; width: 78px;">
+                                <span class="badge ${badgeClase[m]}">${m}</span>
+                            </td>
+                            <td style="padding: 4px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82rem; font-weight: 600; color: #1e293b;">
+                                Actual = (${r.m.toFixed(2)} × Forecast) ${signoB}
+                            </td>
+                            <td style="padding: 4px 6px; text-align: right; color: #64748b; font-size: 0.78rem; white-space: nowrap;">
+                                R²=${(r.r2 * 100).toFixed(0)}%
+                            </td>
+                            <td style="padding: 4px 6px; text-align: right; color: #94a3b8; font-size: 0.75rem; white-space: nowrap;">
+                                n=${r.n}
+                            </td>
+                        </tr>`;
                 } else if (r.n > 0) {
-                    lineasModelo += `&nbsp;&nbsp;• <b>${m}:</b> <span style="color: #95a5a6; font-size: 0.85rem;">Insufficient samples (n=${r.n})</span><br>`;
+                    filasTabla += `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 4px 6px; width: 78px;">
+                                <span class="badge ${badgeClase[m]}">${m}</span>
+                            </td>
+                            <td colspan="3" style="padding: 4px 6px; color: #94a3b8; font-size: 0.8rem; font-style: italic;">
+                                Insufficient samples (n=${r.n})
+                            </td>
+                        </tr>`;
                 }
             });
 
-            if (lineasModelo !== '') {
-                bloqueHtml += `<div style="margin-bottom: 8px;">
-                    <span style="font-size: 0.95rem; font-weight: 700;">${regimInfo[reg].label}</span>
-                    <small style="color: #7f8c8d; display: block; margin-bottom: 2px;">${regimInfo[reg].desc}</small>
-                    ${lineasModelo}
-                </div>`;
+            if (filasTabla !== '') {
+                bloqueHtml += `
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px;">
+                            <span style="font-size: 0.88rem; font-weight: 700; color: #1e293b;">
+                                ${regimInfo[reg].label} <span style="font-weight: 500; color: #64748b; font-size: 0.78rem;">(${regimInfo[reg].angulo})</span>
+                            </span>
+                            <span style="font-size: 0.73rem; color: #94a3b8;">${regimInfo[reg].desc}</span>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                            <tbody>${filasTabla}</tbody>
+                        </table>
+                    </div>`;
             }
         });
 
@@ -1257,24 +1390,37 @@ function renderFormulaCorreccion(list) {
     const htmlRacha  = renderRegimenes('racha');
 
     if (!htmlViento && !htmlRacha) {
-        divFormula.innerHTML = "Not enough samples with valid orientation data for the current filters.";
+        divFormula.innerHTML = "<p style='color:#64748b; font-size:0.9rem; margin:0;'>Not enough samples with valid orientation data for the current filters.</p>";
         divDetalle.innerHTML = "";
         return;
     }
 
     const tituloOrigen = esGlobal 
-        ? "<b>🌐 18 GLOBAL FORMULAS MATRIX</b><br><small style='font-weight:normal; color:#555;'>Calculated across all takeoffs and weather stations based on the wind direction incidence at the takeoff.</small><br><br>"
-        : `<b>📍 SPECIFIC FORMULAS FOR: ${lugarSel}</b><br><br>`;
+        ? `<div style="margin-bottom: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
+               <div style="font-size: 0.98rem; font-weight: 700; color: #0f172a;">🌐 18 GLOBAL FORMULAS MATRIX</div>
+               <div style="font-size: 0.8rem; color: #475569; margin-top: 3px; line-height: 1.45;">
+                   Calculated across all takeoffs and weather stations based on the wind direction incidence at the takeoff. 
+                   These formulas are implemented in the <a href='https://flydecision.com/' target='_blank' style="color: #2563eb; font-weight: 600; text-decoration: underline;">Fly Decision</a> application and correct (optionally by checkbox in Settings menu) the original model data, adapting it more closely to the actual conditions at paragliding launch sites, according to the agreement between the forecast wind direction and the actual launch orientation(s). 
+                   <span style="color: #64748b; display: block; margin-top: 2px;"><b>Note:</b> To prevent unsafe artificial dampening of peak gusts caused by regression to the mean, gusts use a safety-locked slope (m = 1.00) adjusting only for mean bias offset.</span>
+               </div>
+           </div>`
+        : `<div style="margin-bottom: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
+               <div style="font-size: 0.98rem; font-weight: 700; color: #0f172a;">📍 SPECIFIC FORMULAS FOR: ${lugarSel}</div>
+           </div>`;
 
     divFormula.innerHTML = tituloOrigen +
-        `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
-            <div style="background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #d0e1fd;">
-                <h4 style="margin: 0 0 10px 0; color: #1a252f; border-bottom: 2px solid #3498db; padding-bottom: 4px;">💨 Average Wind</h4>
-                ${htmlViento || '<span style="color:#95a5a6;">No data</span>'}
+        `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px;">
+            <div style="background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                <div style="font-size: 0.92rem; font-weight: 700; color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 4px; margin-bottom: 10px;">
+                    💨 Average Wind
+                </div>
+                ${htmlViento || '<span style="color:#94a3b8; font-size:0.85rem;">No data</span>'}
             </div>
-            <div style="background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #d0e1fd;">
-                <h4 style="margin: 0 0 10px 0; color: #1a252f; border-bottom: 2px solid #e67e22; padding-bottom: 4px;">💨 Maximum Gust</h4>
-                ${htmlRacha || '<span style="color:#95a5a6;">No data</span>'}
+            <div style="background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                <div style="font-size: 0.92rem; font-weight: 700; color: #9a3412; border-bottom: 2px solid #f97316; padding-bottom: 4px; margin-bottom: 10px;">
+                    💨 Maximum Gust
+                </div>
+                ${htmlRacha || '<span style="color:#94a3b8; font-size:0.85rem;">No data</span>'}
             </div>
         </div>`;
 
