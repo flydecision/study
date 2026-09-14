@@ -1313,29 +1313,8 @@ function renderFormulaCorreccion(list) {
                     return obtenerRegimenViento(dir, oriStr) === reg;
                 });
 
-                let r;
-                if (paramKey === 'racha') {
-                    // 🛡️ CORRECCIÓN SEGURA DE RACHAS: Fijamos m = 1.00 y calculamos el sesgo puro (Offset)
-                    const puntosRacha = subLista.map(it => {
-                        const pred = it.modelos[m].rachaPred;
-                        const real = it.real.racha;
-                        return (pred !== null && !isNaN(pred) && real !== null && !isNaN(real)) ? { x: pred, y: real } : null;
-                    }).filter(Boolean);
-
-                    if (puntosRacha.length >= 5) {
-                        const n = puntosRacha.length;
-                        const sumX = puntosRacha.reduce((s, p) => s + p.x, 0);
-                        const sumY = puntosRacha.reduce((s, p) => s + p.y, 0);
-                        const offset = (sumY / n) - (sumX / n);
-                        
-                        r = { m: 1.00, b: offset, r2: calcRegresion(subLista, m, paramKey).r2, n: n };
-                    } else {
-                        r = { m: 1.00, b: 0, r2: 0, n: puntosRacha.length };
-                    }
-                } else {
-                    // Viento medio: regresión OLS estándar
-                    r = calcRegresion(subLista, m, paramKey);
-                }
+                // Regresión lineal OLS estándar pura tanto para viento medio como para racha
+                const r = calcRegresion(subLista, m, paramKey);
 
                 if (r.n >= 5) {
                     const signoB = r.b >= 0 ? `+ ${r.b.toFixed(1)}` : `- ${Math.abs(r.b).toFixed(1)}`;
@@ -1400,8 +1379,7 @@ function renderFormulaCorreccion(list) {
                <div style="font-size: 0.98rem; font-weight: 700; color: #0f172a;">🌐 18 GLOBAL FORMULAS MATRIX</div>
                <div style="font-size: 0.8rem; color: #475569; margin-top: 3px; line-height: 1.45;">
                    Calculated across all takeoffs and weather stations based on the wind direction incidence at the takeoff. 
-                   These formulas are implemented in the <a href='https://flydecision.com/' target='_blank' style="color: #2563eb; font-weight: 600; text-decoration: underline;">Fly Decision</a> application and correct (optionally by checkbox in Settings menu) the original model data, adapting it more closely to the actual conditions at paragliding launch sites, according to the agreement between the forecast wind direction and the actual launch orientation(s). 
-                   <span style="color: #64748b; display: block; margin-top: 2px;"><b>Note:</b> To prevent unsafe artificial dampening of peak gusts caused by regression to the mean, gusts use a safety-locked slope (m = 1.00) adjusting only for mean bias offset.</span>
+                   These formulas are implemented in the <a href='https://flydecision.com/' target='_blank' style="color: #2563eb; font-weight: 600; text-decoration: underline;">Fly Decision</a> application and correct (optionally by checkbox in Settings menu) the original model data, adapting it more closely to the actual conditions at paragliding launch sites, according to the agreement between the forecast wind direction and the actual launch orientation(s).
                </div>
            </div>`
         : `<div style="margin-bottom: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
