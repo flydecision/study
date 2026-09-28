@@ -1,7 +1,7 @@
 ﻿id_despegue;id_baliza;nombre_lugar;orientaciones;archivo_datos_balizas;link
 838;C066;Untzueta;135,180,225,270,315;balizas_euskalmet_6h.json;https://flydecision.com/?lat=43.1370&lon=-2.9080&zoom=14
 790;C048;Herrera;180;balizas_euskalmet_6h.json;https://flydecision.com/?lat=42.5930&lon=-2.6710&zoom=14
-770;s1126;Santa Marina (Iturmendi);0,23;balizas_holfuy_6h.json;https://flydecision.com/?lat=42.8685&lon=-2.1157&zoom=14
+770;s1126;Santa Marina (Iturmendi);0,23;balizas_holfuy_6h.json;https://flydecision.com/?lat=42.8712&lon=-2.1147&zoom=14
 1023;s1604;Montana - Cry d'Er;135,45,90,180,225,270,315;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.3370&lon=7.4801&zoom=14
 1187;s1809;Crap Sogn Gion / Flims;180,225,135;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.8339&lon=9.2154&zoom=14
 1162;s1287;Klein Matterhorn;270,90;balizas_holfuy_6h.json;https://flydecision.com/?lat=45.9346&lon=7.7311&zoom=14

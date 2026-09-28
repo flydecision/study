@@ -91,12 +91,10 @@ $dataIcon  = obtenerJsonMeteoLocal('estudio_meteo-datos-icon.json');
 $dataEcmwf = obtenerJsonMeteoLocal('meteo-datos-ecmwf.json');
 
 if (!$dataMeteo) {
-    $rutaDiag = __DIR__ . '/meteo-datos.json';
+    $rutaDiag = dirname(__DIR__) . '/meteo-datos.json';
     $existe = file_exists($rutaDiag);
     $tam = $existe ? filesize($rutaDiag) : null;
     $mtime = $existe ? date('Y-m-d H:i:s', filemtime($rutaDiag)) : null;
-    " | __DIR__=" . __DIR__ .
-    " | contenido_carpeta=" . $contenidoCarpeta .
     $inicio = $existe ? substr(@file_get_contents($rutaDiag, false, null, 0, 200), 0, 200) : null;
     $contenidoCarpeta = implode(', ', array_diff(scandir(__DIR__), ['.', '..']));
     die(date('Y-m-d H:i:s') . " | Error: No se pudieron cargar los pronósticos de meteo-datos.json.\n" .
@@ -159,6 +157,9 @@ $ts6h  = $nowTs + (6 * 3600);
 $ts24h = $nowTs + (24 * 3600);
 $ts48h = $nowTs + (48 * 3600);
 $ts72h = $nowTs + (72 * 3600);
+$ts96h  = $nowTs + (96 * 3600);
+$ts120h = $nowTs + (120 * 3600);
+$ts144h = $nowTs + (144 * 3600);
 
 $fechaCaptura = date('Y-m-d H:i:s', $nowTs);
 $cacheBalizasJSON = [];
@@ -324,7 +325,7 @@ function getClosestForecastDataStrict($hourlyData, $targetTs, $modeloRequerido) 
     return null;
 }
 
-function getClosestForecastDataEcmwf($hourlyEcmwf, $targetTs, $altitudDespegue) {
+function getClosestForecastDataEcmwf($hourlyEcmwf, $targetTs, $altitudDespegue, $maxDiffSeconds = 5400) {
     if (empty($hourlyEcmwf) || empty($hourlyEcmwf['time'])) return null;
     $closestIndex = null;
     $minDiff = null;
@@ -342,7 +343,7 @@ function getClosestForecastDataEcmwf($hourlyEcmwf, $targetTs, $altitudDespegue) 
         }
     }
 
-    if ($closestIndex !== null) {
+    if ($closestIndex !== null && $minDiff <= $maxDiffSeconds) {
         $res = interpolarVientoAltitudReal(
             $altitudDespegue,
             $hourlyEcmwf['geopotential_height_1000hPa'][$closestIndex] ?? null,
@@ -360,13 +361,18 @@ function getClosestForecastDataEcmwf($hourlyEcmwf, $targetTs, $altitudDespegue) 
         );
 
         if ($res !== null) {
-            $gustRaw = $hourlyEcmwf['wind_gusts_10m'][$closestIndex] ?? null;
+            $gustRaw    = $hourlyEcmwf['wind_gusts_10m'][$closestIndex] ?? null;
+            $speed10Raw = $hourlyEcmwf['wind_speed_10m'][$closestIndex] ?? null;
+            $dir10Raw   = $hourlyEcmwf['wind_direction_10m'][$closestIndex] ?? null;
             return [
                 // Formateamos el timestamp a la zona horaria local (Europe/Madrid)
                 'fecha' => date('Y-m-d H:i', $closestTs),
                 'speed' => round($res['speed']),
                 'gusts' => $gustRaw !== null ? round($gustRaw) : null,
-                'dir'   => round($res['dir'])
+                'dir'   => round($res['dir']),
+                // Viento a 10 m del modelo de 9 km, sin interpolar por altitud (para compararlo con el interpolado)
+                'speed10' => $speed10Raw !== null ? round($speed10Raw) : null,
+                'dir10'   => $dir10Raw   !== null ? round($dir10Raw)   : null
             ];
         }
     }
@@ -445,7 +451,17 @@ if (!$logExists) {
         '6h_icon_media', '6h_icon_racha', '6h_icon_direccion',
         '6h_ecmwf_media', '6h_ecmwf_direccion',
         // Racha ECMWF (añadida después; mismo motivo, va al final)
-        '24h_ecmwf_racha', '48h_ecmwf_racha', '72h_ecmwf_racha', '6h_ecmwf_racha'
+        '24h_ecmwf_racha', '48h_ecmwf_racha', '72h_ecmwf_racha', '6h_ecmwf_racha',
+        // Horizontes +4, +5 y +6 días (solo ECMWF: AromeHD/ICON-EU no llegan tan lejos)
+        '96h_pronostico_momento', '96h_ecmwf_media', '96h_ecmwf_racha', '96h_ecmwf_direccion',
+        '120h_pronostico_momento', '120h_ecmwf_media', '120h_ecmwf_racha', '120h_ecmwf_direccion',
+        '144h_pronostico_momento', '144h_ecmwf_media', '144h_ecmwf_racha', '144h_ecmwf_direccion',
+        // Comparativa ECMWF: viento a 10 m del modelo (sin interpolar) + datos para analizar por diferencia de altitud
+        'altitud_despegue', 'elevacion_modelo_ecmwf',
+        '6h_ecmwf10_media', '6h_ecmwf10_direccion', '24h_ecmwf10_media', '24h_ecmwf10_direccion',
+        '48h_ecmwf10_media', '48h_ecmwf10_direccion', '72h_ecmwf10_media', '72h_ecmwf10_direccion',
+        '96h_ecmwf10_media', '96h_ecmwf10_direccion', '120h_ecmwf10_media', '120h_ecmwf10_direccion',
+        '144h_ecmwf10_media', '144h_ecmwf10_direccion'
     ], ';');
 }
 
@@ -538,7 +554,8 @@ foreach ($mapeos as $map) {
     }
 
     // --- Extraer Pronósticos ECMWF (Interpolados a Altitud Real) ---
-    $ec6 = $ec24 = $ec48 = $ec72 = null;
+    $elevModeloEcmwf = '';
+    $ec6 = $ec24 = $ec48 = $ec72 = $ec96 = $ec120 = $ec144 = null;
     if ($dataEcmwf && isset($ecmwfIndexMap[$idDespegue])) {
         $idxEcmwf = $ecmwfIndexMap[$idDespegue];
 
@@ -548,10 +565,15 @@ foreach ($mapeos as $map) {
 
         if (isset($dataEcmwf['respuestas'][$idxEcmwf]['hourly'])) {
             $hourlyEcmwf = $dataEcmwf['respuestas'][$idxEcmwf]['hourly'];
+            $elevRaw = $dataEcmwf['respuestas'][$idxEcmwf]['elevation'] ?? null;
+            $elevModeloEcmwf = is_numeric($elevRaw) ? round($elevRaw) : '';
             $ec6  = getClosestForecastDataEcmwf($hourlyEcmwf, $ts6h, $altitudDespegue);
             $ec24 = getClosestForecastDataEcmwf($hourlyEcmwf, $ts24h, $altitudDespegue);
             $ec48 = getClosestForecastDataEcmwf($hourlyEcmwf, $ts48h, $altitudDespegue);
             $ec72 = getClosestForecastDataEcmwf($hourlyEcmwf, $ts72h, $altitudDespegue);
+            $ec96  = getClosestForecastDataEcmwf($hourlyEcmwf, $ts96h, $altitudDespegue);
+            $ec120 = getClosestForecastDataEcmwf($hourlyEcmwf, $ts120h, $altitudDespegue);
+            $ec144 = getClosestForecastDataEcmwf($hourlyEcmwf, $ts144h, $altitudDespegue);
         }
     }
 
@@ -560,6 +582,9 @@ foreach ($mapeos as $map) {
     $momento24 = $p24['fecha'] ?? $icon24['fecha'] ?? $ec24['fecha'] ?? date('Y-m-d H:i', $ts24h);
     $momento48 = $p48['fecha'] ?? $icon48['fecha'] ?? $ec48['fecha'] ?? date('Y-m-d H:i', $ts48h);
     $momento72 = $p72['fecha'] ?? $icon72['fecha'] ?? $ec72['fecha'] ?? date('Y-m-d H:i', $ts72h);
+    $momento96  = $ec96['fecha']  ?? date('Y-m-d H:i', $ts96h);
+    $momento120 = $ec120['fecha'] ?? date('Y-m-d H:i', $ts120h);
+    $momento144 = $ec144['fecha'] ?? date('Y-m-d H:i', $ts144h);
 
     // --- Preparar fila de registro ---
     $row = [
@@ -590,7 +615,17 @@ foreach ($mapeos as $map) {
         $icon6['speed'] ?? '', $icon6['gusts'] ?? '', $icon6['dir'] ?? '',
         $ec6['speed'] ?? '', $ec6['dir'] ?? '',
         // Racha ECMWF (añadida después; va al final para no desalinear el CSV histórico)
-        $ec24['gusts'] ?? '', $ec48['gusts'] ?? '', $ec72['gusts'] ?? '', $ec6['gusts'] ?? ''
+        $ec24['gusts'] ?? '', $ec48['gusts'] ?? '', $ec72['gusts'] ?? '', $ec6['gusts'] ?? '',
+        // +4, +5 y +6 días (solo ECMWF)
+        $momento96,  $ec96['speed']  ?? '', $ec96['gusts']  ?? '', $ec96['dir']  ?? '',
+        $momento120, $ec120['speed'] ?? '', $ec120['gusts'] ?? '', $ec120['dir'] ?? '',
+        $momento144, $ec144['speed'] ?? '', $ec144['gusts'] ?? '', $ec144['dir'] ?? '',
+        // Comparativa ECMWF 10 m vs interpolado (altitud 0 = desconocida, se deja vacía)
+        $altitudDespegue > 0 ? $altitudDespegue : '', $elevModeloEcmwf,
+        $ec6['speed10'] ?? '',   $ec6['dir10'] ?? '',   $ec24['speed10'] ?? '',  $ec24['dir10'] ?? '',
+        $ec48['speed10'] ?? '',  $ec48['dir10'] ?? '',  $ec72['speed10'] ?? '',  $ec72['dir10'] ?? '',
+        $ec96['speed10'] ?? '',  $ec96['dir10'] ?? '',  $ec120['speed10'] ?? '', $ec120['dir10'] ?? '',
+        $ec144['speed10'] ?? '', $ec144['dir10'] ?? ''
     ];
 
     if (fputcsv($logHandle, $row, ';') !== FALSE) {

@@ -6,6 +6,8 @@
 <title>Weather model accuracy comparison against real station data</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
     :root {
         --bg-color: #f4f6f9;
@@ -159,6 +161,18 @@
         margin-bottom: 25px; border: 1px solid var(--border);
         box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
+    #mapa-despegues {
+        width: 100%;
+        height: 420px;
+        border-radius: 8px;
+        z-index: 0;
+    }
+    .leaflet-popup-content a {
+        color: var(--primary);
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .leaflet-popup-content a:hover { text-decoration: underline; }
     h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 6px; }
     .section-desc { color: var(--text-sub); margin-bottom: 15px; }
 
@@ -282,11 +296,11 @@
                 <ul>
                     <li><strong>3 Models:</strong> AromeHD 1.3km / ICON-EU 7km / ECMWF IFS 9km</li>
                     <li><strong>97 Weather Stations:</strong> Located at 97 paragliding takeoffs</li>
-                    <li><strong>3 Parameters:</strong> Average wind speed, maximum gust, and direction</li>
+                    <li><strong>3 Parameters:</strong> Average wind speed, maximum gust and direction</li>
                     <li><strong>6 Time Slots:</strong> Real data and forecast snapshots at 9, 11, 13, 15, 17, and 19h daily (local time CET/CEST <i>Europe/Madrid</i>)</li>
-                    <li><strong>4 Forecast Horizons:</strong> +6h / +24h / +48h / +72h</li>
+                    <li><strong>7 Forecast Horizons:</strong> +6h / +1 day / +2 days / +3 days / +4 days / +5 days / +6 days</li>
                 </ul>
-                <a href="https://flydecision.com/estudio/estudio.csv" target="_blank" rel="noopener noreferrer">Open source data (CSV)</a>. <a href="https://giter norehub.com/flydecision/study" target="_blank" rel="noopener noreferrer">Open source code (GitHub)</a>. Everything is updated automatically, so you can view or download the data to verify it, report errors, suggest improvements, or perform your own analysis.
+                <a href="https://flydecision.com/estudio/estudio.csv" target="_blank" rel="noopener noreferrer">Open source data (CSV)</a> <b>|</b> <a href="https://giter norehub.com/flydecision/study" target="_blank" rel="noopener noreferrer">Open source code (GitHub)</a>. Everything is updated automatically, so you can view or download the data to verify it, report errors, suggest improvements, or perform your own analysis.
             </div>
         </div>
     </header>
@@ -299,7 +313,7 @@
         </div>
     </div>
     <div id="aviso-espera" class="notice" style="display:none;">
-        ⏳ <b>Accumulating data:</b> there are not enough validated matches (real vs. forecast) yet to display the study. Please check back when 24-72h have passed since the first data captures.
+        ⏳ <b>Accumulating data:</b> there are not enough validated matches (real vs. forecast) yet to display the study. Please check back when 1-3 days have passed since the first data captures.
     </div>
 
     <div id="dashboard" style="display:none;">
@@ -325,6 +339,13 @@
             </div>
         </div>
 
+        <!-- ============ MAPA DE DESPEGUES DEL ESTUDIO ============ -->
+        <div class="section-card">
+            <h2>🗺️ Map of monitored takeoffs with on-site weather stations:</h2>
+            <div class="section-desc">Click a marker to open that takeoff in FlyDecision.com.</div>
+            <div id="mapa-despegues"></div>
+        </div>
+
         <!-- ============ RESUMEN / RANKING GENERAL ============ -->
         <div class="section-card">
             <h2>🏆 Overall Ranking:</h2>
@@ -336,7 +357,7 @@
 
             <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
                 <strong>ℹ️ How is the Champion Score calculated:</strong>
-                <p>The score represents the model's <b>average ranking position</b> across all parameters (wind, gust, direction) and forecast horizons (+6h, +24h, +48h, +72h).</p>
+                <p>The score represents the model's <b>average ranking position</b> across all parameters (wind, gust, direction) and forecast horizons (+6h, +1 day, +2 days, +3 days).</p>
                 <p>For every valid comparison, models are ranked by their absolute error (MAE):</p>
                 <ul style="margin-top: 6px; margin-bottom: 6px;">
                     <li><b>1st place (best)</b> = 1 point</li>
@@ -344,14 +365,14 @@
                     <li><b>3rd place (worst)</b> = 3 points</li>
                 </ul>
                 <p>A lower score is better (a perfect score of <b>1.00</b> means the model won every single comparison). The number in parentheses <b>(matches)</b> indicates how many valid comparisons were made to calculate this average.</p>
-                <p>This overall ranking already takes into account that AromeHD does not compete in +48h and +72h horizons.</p>
+                <p>This overall ranking already takes into account that AromeHD does not compete in the +2 and +3 days horizons, and ICON-EU does not go beyond +3 days. From +4 to +6 days only ECMWF is evaluated (no model comparison, just how its accuracy decays), so those horizons are excluded from the overall ranking.</p>
             </div>
         </div>
 
         <!-- ============ TABLA POR HORIZONTE, MODELO Y PARÁMETROS ============ -->
         <div class="section-card">
             <h2>🏆 Results by Horizon, Model and Parameters:</h2>
-            <div class="section-desc">Cross-table of forecast time horizons (+6h, +24h, +48h, +72h) for each model and analyzed parameters (average wind, maximum wind gust and wind direction). Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and MBE (Mean Bias Error).</div>
+            <div class="section-desc">Cross-table of forecast time horizons (+6h, +1 day, +2 days, +3 days, +4 days, +5 days, +6 days) for each model and analyzed parameters (average wind, maximum wind gust and wind direction). Shows the winning model label in each specific cell along with its Mean Absolute Error (MAE) and MBE (Mean Bias Error).</div>
             <table>
                 <thead>
                     <tr>
@@ -376,15 +397,48 @@
                     • <b>RMSE (Root Mean Square Error):</b> Similar to MAE, but penalizes large errors more heavily. When RMSE is noticeably higher than MAE, it means the model is usually reasonably accurate but occasionally makes large mistakes — rather than being consistently off by a similar amount every time.
                 </p>
                 <p style="margin: 0 0 8px;">
+                    • <b>n:</b> Number of valid forecast-vs-reality comparisons accumulated so far for that specific parameter, model, and forecast horizon. Since the study runs continuously, this number keeps growing over time, so results become statistically more reliable the longer the study runs. The system and automatic analysis generate approximately 2000 new samples per day (this rate assumes normal system uptime, station and system operation and only valid matched samples are counted).
+                </p>
+                <p style="margin: 0 0 8px;">
                     For all statistical calculations on the <i>Direction</i> parameter, a minimum speed threshold of 8 km/h has been established (slightly higher than the ICAO/METAR standard of 3 knots / 5.5 km/h). The goal is to minimize what is called in meteorological statistics "the noise of calms" (large random direction fluctuations in light winds).
                 </p>
                 <p style="margin: 0 0 8px;">
                     <b>ℹ️ Global Score (0-10) is calculated weighted:</b> Penalty = (Avg MAE × 0.4) + (Gust MAE × 0.3) + (Dir Error × 0.08 × 0.3). Score = max(0, 10 - Penalty / 1.5).
                 </p>
                 <p style="margin: 0 0 8px;">
-                    ℹ️ AromeHD does not compete in +48h and +72h horizons.
+                    ℹ️ AromeHD does not compete in the +2 and +3 days horizons, and ICON-EU does not go beyond +3 days. From +4 to +6 days only ECMWF is evaluated (no model comparison, just how its accuracy decays), so those horizons are excluded from the overall ranking.
                 </p>
             </div>
+        </div>
+
+        <!-- ============ COMPARATIVA ECMWF: 10 m vs INTERPOLADO ============ -->
+        <div class="section-card">
+            <h2>🔬 ECMWF: 10 m Wind vs. Altitude-Interpolated Wind</h2>
+            <div class="section-desc">Experimental comparison of two ways of obtaining average wind and direction from ECMWF: the model's native 10 m wind (9 km grid, at the model's own terrain height) and the wind interpolated from pressure levels to the real takeoff altitude using geopotential height. Gusts are not compared because both variants use the same 10 m model gust. Only samples where both variants have data are used, so the comparison is fair. This section is excluded from the overall ranking and only accumulates data from the day it was deployed.</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Horizon</th><th>n (wind / dir)</th>
+                        <th>Average – Interpolated</th>
+                        <th>Average – 10 m</th>
+                        <th>Direction – Interpolated</th>
+                        <th>Direction – 10 m</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-ecmwf10-horizontes"><tr><td colspan="6" style="text-align:center;">Loading…</td></tr></tbody>
+            </table>
+            <h3 style="margin-top:22px; font-size:1.1rem;">By altitude difference (takeoff altitude − model terrain elevation)</h3>
+            <div class="section-desc">Average wind, all horizons pooled. Tests whether the 10 m wind loses accuracy as the takeoff sits higher above the terrain of the model's grid cell.</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Altitude difference</th><th>n</th><th>Takeoffs</th>
+                        <th>Average – Interpolated</th>
+                        <th>Average – 10 m</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-ecmwf10-altitud"><tr><td colspan="5" style="text-align:center;">Loading…</td></tr></tbody>
+            </table>
         </div>
 
         <!-- ============ FILTROS + GRÁFICAS + DETALLE ============ -->
@@ -402,9 +456,12 @@
                     <select id="horizonteSelect" onchange="actualizarVistaDetalle()">
                         <option value="all">All Horizons</option>
                         <option value="6">+6 hours</option>
-                        <option value="24">+24 hours</option>
-                        <option value="48">+48 hours</option>
-                        <option value="72">+72 hours</option>
+                        <option value="24">+1 day</option>
+                        <option value="48">+2 days</option>
+                        <option value="72">+3 days</option>
+                        <option value="96">+4 days</option>
+                        <option value="120">+5 days</option>
+                        <option value="144">+6 days</option>
                     </select>
                 </div>
                 <div>
@@ -466,9 +523,34 @@
 <script>
 document.addEventListener('DOMContentLoaded', cargarEstudio);
 
-let CRUCES = { '6': [], '24': [], '48': [], '72': [] };
+// Horizontes del estudio. 'key' es el sufijo interno de las columnas del CSV ({key}h_...)
+// y NO cambia (así el histórico sigue siendo válido); 'label' es lo que ve el usuario.
+const HORIZONTES = [
+    { key: '6',   label: '+6h' },
+    { key: '24',  label: '+1 day' },
+    { key: '48',  label: '+2 days' },
+    { key: '72',  label: '+3 days' },
+    { key: '96',  label: '+4 days' },
+    { key: '120', label: '+5 days' },
+    { key: '144', label: '+6 days' }
+];
+const HORIZ_KEYS = HORIZONTES.map(h => h.key);
+const horizLabel = key => (HORIZONTES.find(h => h.key === key) || {}).label || `+${key}h`;
+// Modelos que realmente tienen pronóstico en cada horizonte
+const MODELOS_POR_HORIZ = {
+    '6':   ['AromeHD', 'ICON-EU', 'ECMWF'],
+    '24':  ['AromeHD', 'ICON-EU', 'ECMWF'],
+    '48':  ['ICON-EU', 'ECMWF'],
+    '72':  ['ICON-EU', 'ECMWF'],
+    '96':  ['ECMWF'],
+    '120': ['ECMWF'],
+    '144': ['ECMWF']
+};
+let CRUCES = Object.fromEntries(HORIZ_KEYS.map(k => [k, []]));
 let LINKS_DESPEGUES = {}; 
 let ORIENTACIONES_DESPEGUES = {}; // 🧭 Guarda las orientaciones de cada despegue
+let PUNTOS_MAPA = []; // 🗺️ {id, nombre, lat, lon, link} para el mapa de despegues
+let mapaDespegues = null;
 let charts = { bias: null, biasRacha: null, history: null, historyRacha: null, historyDir: null };
 
 const coloresModelo = {
@@ -529,10 +611,13 @@ async function cargarEstudio() {
         renderEstadoEstudio(rows);
         renderResumenGlobal();
         renderTablaHorizontes();
+        renderComparativaEcmwf();
         actualizarVistaDetalle();
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
+
+        renderMapaDespegues(PUNTOS_MAPA);
     } catch (err) {
         console.error(err);
         // Si hay un error, lo muestra elegantemente dentro de la tarjeta con botón de reintento
@@ -586,7 +671,8 @@ function parseCSV(text) {
     const rows = [];
     for (let i = 1; i < logicalLines.length; i++) {
         const values = parseCSVLine(logicalLines[i], ';');
-        if (values.length >= headers.length - 4) {
+        // 45 = nº de columnas del CSV original; las filas antiguas (45 o 49 campos) siguen siendo válidas
+        if (values.length >= 45 && values.length <= headers.length) {
             const obj = {};
             headers.forEach((h, idx) => { obj[h] = values[idx] ?? ''; });
             rows.push(obj);
@@ -614,10 +700,62 @@ function parseMapCSV(text) {
                 map[row.id_despegue] = row.link || '#';
                 // 🧭 Guardamos las orientaciones asociadas al ID de despegue
                 ORIENTACIONES_DESPEGUES[row.id_despegue] = row.orientaciones || '';
+
+                // 🗺️ Extraemos lat/lon del propio link (?lat=..&lon=..) para el mapa
+                if (row.link) {
+                    const mLat = row.link.match(/[?&]lat=(-?\d+(\.\d+)?)/);
+                    const mLon = row.link.match(/[?&]lon=(-?\d+(\.\d+)?)/);
+                    if (mLat && mLon) {
+                        PUNTOS_MAPA.push({
+                            id: row.id_despegue,
+                            nombre: row.nombre_lugar || row.id_despegue,
+                            lat: parseFloat(mLat[1]),
+                            lon: parseFloat(mLon[1]),
+                            link: row.link
+                        });
+                    }
+                }
             }
         }
     }
     return map;
+}
+
+/* ---------------------------------------------------------------------
+ * MAPA DE DESPEGUES DEL ESTUDIO
+ * ------------------------------------------------------------------- */
+function renderMapaDespegues(puntos) {
+    const el = document.getElementById('mapa-despegues');
+    if (!el || !puntos || puntos.length === 0) return;
+
+    // Si ya existe (p.ej. recarga sin refrescar página), lo destruimos primero
+    if (mapaDespegues) {
+        mapaDespegues.remove();
+        mapaDespegues = null;
+    }
+
+    mapaDespegues = L.map('mapa-despegues');
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+    }).addTo(mapaDespegues);
+
+    const marcadores = [];
+    puntos.forEach(p => {
+        const marker = L.marker([p.lat, p.lon], { title: p.nombre }).addTo(mapaDespegues);
+        marker.bindTooltip(p.nombre, { direction: 'top', offset: [0, -30] });
+        // Clic directo en el marcador: lleva a la ficha de ese despegue en la app
+        marker.on('click', () => window.open(p.link, '_blank', 'noopener,noreferrer'));
+        marcadores.push(marker);
+    });
+
+    // Encuadre automático para que se vean todos los puntos
+    const grupo = L.featureGroup(marcadores);
+    mapaDespegues.fitBounds(grupo.getBounds().pad(0.1));
+
+    // Si el contenedor estaba oculto durante la creación, corregimos el tamaño
+    setTimeout(() => mapaDespegues.invalidateSize(), 100);
 }
 
 // Determines wind regime: Headwind (<=45°), Crosswind (46°-90°) or Tailwind (>90°)
@@ -781,7 +919,7 @@ function procesarDatos(rows) {
         }
     });
 
-    CRUCES = { '6': [], '24': [], '48': [], '72': [] };
+    CRUCES = Object.fromEntries(HORIZ_KEYS.map(k => [k, []]));
 
     // 2. Cruzamos los pronósticos buscando la realidad MÁS CERCANA en tiempo
     rows.forEach(r => {
@@ -830,6 +968,14 @@ function procesarDatos(rows) {
                     media: parseFloat(r[`${h}h_ecmwf_media`]),
                     racha: parseFloat(r[`${h}h_ecmwf_racha`]),
                     dir: parseFloat(r[`${h}h_ecmwf_direccion`])
+                },
+                // Variante con el viento a 10 m del modelo (sin interpolar por altitud).
+                // NO está en MODELOS: no entra en el ranking ni en las tablas principales, solo en
+                // la sección "ECMWF: 10 m vs altitude-interpolated". La racha es la misma de ECMWF.
+                'ECMWF-10m': {
+                    media: parseFloat(r[`${h}h_ecmwf10_media`]),
+                    racha: parseFloat(r[`${h}h_ecmwf_racha`]),
+                    dir: parseFloat(r[`${h}h_ecmwf10_direccion`])
                 }
             };
 
@@ -843,7 +989,10 @@ function procesarDatos(rows) {
                     horaToma = h;
                 }
             }
-            const item = { idDespegue, lugar, baliza, red, fecha: fechaDia, hora: horaToma, real, modelos: {} };
+            // Diferencia entre la altitud del despegue y la del terreno del modelo ECMWF (null si falta alguna)
+            const altDespegue = parseFloat(r.altitud_despegue), elevModelo = parseFloat(r.elevacion_modelo_ecmwf);
+            const altDiff = (!isNaN(altDespegue) && !isNaN(elevModelo)) ? altDespegue - elevModelo : null;
+            const item = { idDespegue, lugar, baliza, red, fecha: fechaDia, hora: horaToma, real, altDiff, modelos: {} };
 
             Object.keys(modelos).forEach(m => {
                 const v = modelos[m];
@@ -952,7 +1101,7 @@ function fmtNum(mae, bias, unidad = '', prefix = '', rmse = null, n = null) {
 function renderEstadoEstudio(rows) {
     if (!rows || rows.length === 0) return;
 
-    const totalCruces = CRUCES['6'].length + CRUCES['24'].length + CRUCES['48'].length + CRUCES['72'].length;
+    const totalCruces = HORIZ_KEYS.reduce((s, k) => s + CRUCES[k].length, 0);
 
     const capturas = rows.map(r => r.momento_captura).filter(Boolean).sort();
     if (capturas.length === 0) return;
@@ -991,7 +1140,7 @@ function renderEstadoEstudio(rows) {
 function renderResumenGlobal() {
     const todos = CRUCES['24'];
     const paramKeys = ['viento', 'racha', 'dir'];
-    const horizKeys = ['6', '24', '48', '72'];
+    const horizKeys = HORIZ_KEYS;
     const puntos = {}; MODELOS.forEach(m => puntos[m] = { suma: 0, celdas: 0 });
 
     horizKeys.forEach(h => {
@@ -999,6 +1148,7 @@ function renderResumenGlobal() {
             const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(CRUCES[h], m, p) }))
                 .filter(s => s.mae !== null)
                 .sort((a, b) => a.mae - b.mae);
+            if (rk.length < 2) return; // sin competición no hay posición que puntuar
             rk.forEach((s, i) => { puntos[s.modelo].suma += (i + 1); puntos[s.modelo].celdas += 1; });
         });
     });
@@ -1035,12 +1185,73 @@ function renderResumenGlobal() {
 /* ---------------------------------------------------------------------
  * 3) Tabla por horizonte (24/48/72 x 3 modelos)
  * ------------------------------------------------------------------- */
+// Comparativa aislada: ECMWF con viento a 10 m del modelo vs interpolado por altitud/geopotencial.
+// Usa solo muestras "pareadas" (las dos variantes tienen dato) para que la comparación sea justa;
+// las filas anteriores al despliegue de estas columnas no tienen 10 m y quedan fuera.
+function renderComparativaEcmwf() {
+    const tbH = document.getElementById('tabla-ecmwf10-horizontes');
+    const tbA = document.getElementById('tabla-ecmwf10-altitud');
+    if (!tbH || !tbA) return;
+
+    const pareadas = (list, errKey) => list.filter(it =>
+        it.modelos['ECMWF'][errKey] !== null && it.modelos['ECMWF-10m'][errKey] !== null);
+    const ganador = (a, b) => (a.mae === null || b.mae === null || a.mae === b.mae) ? null : (a.mae < b.mae ? 'interp' : 'diez');
+    const celdaNum = (s, gana) => `<td class="${gana ? 'cell-winner' : ''}">${fmtNum(s.mae, s.bias, ' km/h', gana ? '🥇 ' : '', s.rmse)}</td>`;
+    const celdaDir = (s, gana) => `<td class="${gana ? 'cell-winner' : ''}">${fmtDir(s.mae, s.bias, gana ? '🥇 ' : '', s.rmse)}</td>`;
+
+    // Tabla 1: por horizonte
+    let htmlH = '';
+    HORIZ_KEYS.forEach(k => {
+        const lw = pareadas(CRUCES[k], 'mediaErr');
+        const ld = pareadas(CRUCES[k], 'dirErr');
+        if (lw.length === 0 && ld.length === 0) {
+            htmlH += `<tr><td><b>${horizLabel(k)}</b></td><td colspan="5" style="text-align:center;">No data yet</td></tr>`;
+            return;
+        }
+        const wI = statsModelo(lw, 'ECMWF', 'viento'), w10 = statsModelo(lw, 'ECMWF-10m', 'viento');
+        const dI = statsModelo(ld, 'ECMWF', 'dir'),    d10 = statsModelo(ld, 'ECMWF-10m', 'dir');
+        const gw = ganador(wI, w10), gd = ganador(dI, d10);
+        htmlH += `<tr>
+            <td><b>${horizLabel(k)}</b></td>
+            <td>${lw.length} / ${ld.length}</td>
+            ${celdaNum(wI, gw === 'interp')}${celdaNum(w10, gw === 'diez')}
+            ${celdaDir(dI, gd === 'interp')}${celdaDir(d10, gd === 'diez')}
+        </tr>`;
+    });
+    tbH.innerHTML = htmlH;
+
+    // Tabla 2: viento medio por diferencia de altitud (todos los horizontes juntos)
+    const bins = [
+        { label: '< 150 m',   test: d => d < 150 },
+        { label: '150–400 m', test: d => d >= 150 && d < 400 },
+        { label: '400–800 m', test: d => d >= 400 && d < 800 },
+        { label: '> 800 m',   test: d => d >= 800 }
+    ];
+    const conAlt = HORIZ_KEYS.flatMap(k => CRUCES[k]).filter(it => it.altDiff !== null);
+    let htmlA = '';
+    bins.forEach(b => {
+        const lw = pareadas(conAlt.filter(it => b.test(it.altDiff)), 'mediaErr');
+        if (lw.length === 0) {
+            htmlA += `<tr><td><b>${b.label}</b></td><td colspan="4" style="text-align:center;">No data yet</td></tr>`;
+            return;
+        }
+        const sI = statsModelo(lw, 'ECMWF', 'viento'), s10 = statsModelo(lw, 'ECMWF-10m', 'viento');
+        const g = ganador(sI, s10);
+        const nDesp = new Set(lw.map(it => it.idDespegue)).size;
+        htmlA += `<tr>
+            <td><b>${b.label}</b></td><td>${lw.length}</td><td>${nDesp}</td>
+            ${celdaNum(sI, g === 'interp')}${celdaNum(s10, g === 'diez')}
+        </tr>`;
+    });
+    tbA.innerHTML = htmlA;
+}
+
 function renderTablaHorizontes() {
     let html = '';
-    ['6', '24', '48', '72'].forEach(h => {
+    HORIZ_KEYS.forEach(h => {
         const list = CRUCES[h];
         if (list.length === 0) {
-            html += `<tr class="horizon-divider"><td><b>+${h}h</b></td><td colspan="5" style="text-align:center;">No data</td></tr>`;
+            html += `<tr class="horizon-divider"><td><b>${horizLabel(h)}</b></td><td colspan="5" style="text-align:center;">No data</td></tr>`;
             return;
         }
         const stats = {};
@@ -1058,15 +1269,16 @@ function renderTablaHorizontes() {
 
         const maxScore = Math.max(...MODELOS.map(m => stats[m].score).filter(v => v !== null));
 
-        const isWinner = (val, minVal) => val !== null && minVal !== null && val === minVal;
-
-        const modelosHorizonte = (h === '48' || h === '72') ? MODELOS.filter(m => m !== 'AromeHD') : MODELOS;
+        const modelosHorizonte = MODELOS_POR_HORIZ[h] || MODELOS;
+        // Con un solo modelo en el horizonte no hay competición: no se marca ganador
+        const hayCompeticion = modelosHorizonte.length >= 2;
+        const isWinner = (val, minVal) => hayCompeticion && val !== null && minVal !== null && val === minVal;
         modelosHorizonte.forEach((m, idx) => {
             const s = stats[m];
-            const esGanadorGlobal = s.score !== null && maxScore !== null && s.score === maxScore;
+            const esGanadorGlobal = hayCompeticion && s.score !== null && maxScore !== null && s.score === maxScore;
 
             html += `<tr class="${idx === 0 ? 'horizon-divider' : ''}">
-                ${idx === 0 ? `<td rowspan="${modelosHorizonte.length}"><b>+${h}h</b></td>` : ''}
+                ${idx === 0 ? `<td rowspan="${modelosHorizonte.length}"><b>${horizLabel(h)}</b></td>` : ''}
                 <td><span class="badge ${badgeClase[m]}">${m}</span></td>
                 <td class="${isWinner(s.v.mae, minMedia) ? 'cell-winner' : ''}">${fmtNum(s.v.mae, s.v.bias, ' km/h', isWinner(s.v.mae, minMedia) ? '🥇 ' : '', s.v.rmse, s.v.n)}</td>
                 <td class="${isWinner(s.r.mae, minRacha) ? 'cell-winner' : ''}">${fmtNum(s.r.mae, s.r.bias, ' km/h', isWinner(s.r.mae, minRacha) ? '🥇 ' : '', s.r.rmse, s.r.n)}</td>
@@ -1088,7 +1300,7 @@ function actualizarVistaDetalle() {
 
     let list = [];
     if (horiz === 'all') {
-        list = [...CRUCES['6'], ...CRUCES['24'], ...CRUCES['48'], ...CRUCES['72']];
+        list = HORIZ_KEYS.flatMap(k => CRUCES[k]);
     } else {
         list = CRUCES[horiz] || [];
     }
