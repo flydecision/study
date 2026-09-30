@@ -929,7 +929,7 @@ function procesarDatos(rows) {
         const red = (r.archivo_datos_balizas || '').replace('balizas_', '').replace('_6h.json', '').replace('_cache.json', '');
         const fechaDia = (r.momento_captura || '').substring(0, 10);
 
-        ['6', '24', '48', '72'].forEach(h => {
+        HORIZ_KEYS.forEach(h => {
             const forecastDate = parseToDate(r[`${h}h_pronostico_momento`]);
             if (!forecastDate) return;
 
