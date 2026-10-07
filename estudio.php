@@ -416,7 +416,8 @@ if ($logExists) {
             if (isset($rowLog[0], $rowLog[1]) && $rowLog[0] !== 'momento_captura') {
                 $horaCapturaKey = substr(trim($rowLog[0], '"'), 0, 13); // Extrae "YYYY-MM-DD HH"
                 $idDespKey      = trim($rowLog[1], '"');
-                $capturasExistentes[$idDespKey . '_' . $horaCapturaKey] = true;
+                $idBalKey       = trim($rowLog[2] ?? '', '"');
+                $capturasExistentes[$idDespKey . '_' . $idBalKey . '_' . $horaCapturaKey] = true;
             }
         }
         fclose($handleRead);
@@ -480,7 +481,7 @@ foreach ($mapeos as $map) {
     $archivoBalizas = trim($map['archivo_datos_balizas'] ?? '');
 
     // 🛡️ CONTROL ANTI-DUPLICADOS: Si ya existe captura para este despegue en esta hora, omitir
-    $claveDuplicado = $idDespegue . '_' . $horaActualClave;
+    $claveDuplicado = $idDespegue . '_' . $idBaliza . '_' . $horaActualClave;
     if (isset($capturasExistentes[$claveDuplicado])) {
         $filasOmitidas++;
         continue;
@@ -630,6 +631,7 @@ foreach ($mapeos as $map) {
 
     if (fputcsv($logHandle, $row, ';') !== FALSE) {
         $filasEscritas++;
+        $capturasExistentes[$claveDuplicado] = true;
     }
 }
 
