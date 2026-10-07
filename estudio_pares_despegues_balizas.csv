@@ -1,7 +1,7 @@
 ﻿id_despegue;id_baliza;nombre_lugar;orientaciones;archivo_datos_balizas;link
 838;C066;Untzueta;135,180,225,270,315;balizas_euskalmet_6h.json;https://flydecision.com/?lat=43.1370&lon=-2.9080&zoom=14
 790;C048;Herrera;180;balizas_euskalmet_6h.json;https://flydecision.com/?lat=42.5930&lon=-2.6710&zoom=14
-770;s1126;Santa Marina (Iturmendi);0,23;balizas_holfuy_6h.json;https://flydecision.com/?lat=42.8712&lon=-2.1147&zoom=14
+770;s1126;Santa Marina (Iturmendi);0,23;balizas_holfuy_6h.json;https://flydecision.com/?lat=42.8685&lon=-2.1157&zoom=14
 1023;s1604;Montana - Cry d'Er;135,45,90,180,225,270,315;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.3370&lon=7.4801&zoom=14
 1187;s1809;Crap Sogn Gion / Flims;180,225,135;balizas_holfuy_6h.json;https://flydecision.com/?lat=46.8339&lon=9.2154&zoom=14
 1162;s1287;Klein Matterhorn;270,90;balizas_holfuy_6h.json;https://flydecision.com/?lat=45.9346&lon=7.7311&zoom=14
@@ -86,7 +86,6 @@
 878;2064;Coll de Rates;0,180;balizas_pioupiou_6h.json;https://flydecision.com/?lat=38.7230&lon=-0.0790&zoom=14
 925;2002;Petrés;180,135,90;balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.6875&lon=-0.3022&zoom=14
 932;2004;Villar del Arzobispo (Cerro Castellar);135,90;balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.7280&lon=-0.8512&zoom=14
-967;1376;Pla d'Adet;45,0,315;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8135&lon=0.2982&zoom=14
 1070;1588;Col de la Core;270,315;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8613&lon=1.1079&zoom=14
 253;2079;Resquilones;0,45;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.3971&lon=-4.8308&zoom=14
 1008;373;Moustiers - Courchon;225,270;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.8433&lon=6.2303&zoom=14

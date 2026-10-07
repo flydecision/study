@@ -295,7 +295,7 @@
                 Continuous 24/7 automated analysis comparing weather model forecasts with real wind measurements from weather stations located at paragliding takeoffs. The ultimate goal is to discover which model performs best: overall, or specifically by parameters, locations, times, or forecast horizons.
                 <ul>
                     <li><strong>3 Models:</strong> AromeHD 1.3km / ICON-EU 7km / ECMWF IFS 9km</li>
-                    <li><strong>97 Weather Stations:</strong> Located at 97 paragliding takeoffs</li>
+                    <li><strong>96 Weather Stations:</strong> Located at 96 paragliding takeoffs</li>
                     <li><strong>3 Parameters:</strong> Average wind speed, maximum gust and direction</li>
                     <li><strong>6 Time Slots:</strong> Real data and forecast snapshots at 9, 11, 13, 15, 17, and 19h daily (local time CET/CEST <i>Europe/Madrid</i>)</li>
                     <li><strong>7 Forecast Horizons:</strong> +6h / +1 day / +2 days / +3 days / +4 days / +5 days / +6 days</li>
@@ -479,7 +479,7 @@
             </div>
 
             <div style="background: #f0f8ff; border: 1px solid #bcdff1; padding: 15px; border-radius: 8px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="margin-bottom: 10px;">🧮 Smart Statistical Calibration (MOS) for Average Wind and Gust using Ordinary Least Squares (OLS) Linear Regression based on wind incidence</h3>
+                <h3 style="margin-bottom: 10px;">🧮 Smart Statistical Calibration (MOS) for Average Wind and Gust using Ordinary Least Squares (OLS) Linear Regression, by forecast horizon and model</h3>
                 <div id="formula-correccion" style="font-family: monospace; font-size: 1.1rem; font-weight: bold; color: #2c3e50;">
                     Select a specific takeoff and time to calculate the formula...
                 </div>
@@ -1310,7 +1310,7 @@ function actualizarVistaDetalle() {
 
     renderCharts(list);
     renderTablaDespegues(list, lugarSel);
-    renderFormulaCorreccion(list);
+    renderFormulaCorreccion(lugarSel);
 }
 
 function renderCharts(list) {
@@ -1498,123 +1498,146 @@ function renderTablaDespegues(listHorizonte, lugarFiltro) {
     document.getElementById('tabla-despegues').innerHTML = html || `<tr><td colspan="7" style="text-align:center;">No data for this filter</td></tr>`;
 }
 
-function renderFormulaCorreccion(list) {
+function renderFormulaCorreccion(lugarSel) {
     const divFormula = document.getElementById('formula-correccion');
     const divDetalle = document.getElementById('formula-detalle');
-    
-    const lugarSel = document.getElementById('lugarSelect').value;
     const esGlobal = (lugarSel === 'todos');
 
-    const regimInfo = {
-        headwind:  { label: '🟢 Headwind', angulo: 'Δθ ≤ 45°', desc: 'Wind blowing onto takeoff (optimal slope / thermal lift)' },
-        crosswind: { label: '🟡 Crosswind', angulo: '45° < Δθ ≤ 90°', desc: 'Lateral wind component relative to takeoff' },
-        tailwind:  { label: '🔴 Tailwind', angulo: 'Δθ > 90°', desc: 'Lee side wind / rotors behind takeoff' }
-    };
+    // Umbral minimo de muestras para mostrar una formula de correccion en produccion.
+    // (Antes era 5; se sube a 30 porque con 5 puntos una recta OLS es poco fiable.)
+    const UMBRAL_MIN_N = 30;
 
-    function renderRegimenes(paramKey) {
-        let bloqueHtml = '';
-
-        ['headwind', 'crosswind', 'tailwind'].forEach(reg => {
-            let filasTabla = '';
-
-            MODELOS.forEach(m => {
-                // Filter samples where the model's forecasted direction matches this regime
-                const subLista = list.filter(item => {
-                    const oriStr = ORIENTACIONES_DESPEGUES[item.idDespegue] || '';
-                    const dir = item.modelos[m].dirPred;
-                    return obtenerRegimenViento(dir, oriStr) === reg;
-                });
-
-                // Regresión lineal OLS estándar pura tanto para viento medio como para racha
-                const r = calcRegresion(subLista, m, paramKey);
-
-                if (r.n >= 5) {
-                    const signoB = r.b >= 0 ? `+ ${r.b.toFixed(1)}` : `- ${Math.abs(r.b).toFixed(1)}`;
-                    filasTabla += `
-                        <tr style="border-bottom: 1px solid #f1f5f9;">
-                            <td style="padding: 4px 6px; width: 78px;">
-                                <span class="badge ${badgeClase[m]}">${m}</span>
-                            </td>
-                            <td style="padding: 4px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82rem; font-weight: 600; color: #1e293b;">
-                                Actual = (${r.m.toFixed(2)} × Forecast) ${signoB}
-                            </td>
-                            <td style="padding: 4px 6px; text-align: right; color: #64748b; font-size: 0.78rem; white-space: nowrap;">
-                                R²=${(r.r2 * 100).toFixed(0)}%
-                            </td>
-                            <td style="padding: 4px 6px; text-align: right; color: #94a3b8; font-size: 0.75rem; white-space: nowrap;">
-                                n=${r.n}
-                            </td>
-                        </tr>`;
-                } else if (r.n > 0) {
-                    filasTabla += `
-                        <tr style="border-bottom: 1px solid #f1f5f9;">
-                            <td style="padding: 4px 6px; width: 78px;">
-                                <span class="badge ${badgeClase[m]}">${m}</span>
-                            </td>
-                            <td colspan="3" style="padding: 4px 6px; color: #94a3b8; font-size: 0.8rem; font-style: italic;">
-                                Insufficient samples (n=${r.n})
-                            </td>
-                        </tr>`;
-                }
-            });
-
-            if (filasTabla !== '') {
-                bloqueHtml += `
-                    <div style="margin-bottom: 14px;">
-                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px;">
-                            <span style="font-size: 0.88rem; font-weight: 700; color: #1e293b;">
-                                ${regimInfo[reg].label} <span style="font-weight: 500; color: #64748b; font-size: 0.78rem;">(${regimInfo[reg].angulo})</span>
-                            </span>
-                            <span style="font-size: 0.73rem; color: #94a3b8;">${regimInfo[reg].desc}</span>
-                        </div>
-                        <table style="width: 100%; border-collapse: collapse; margin: 0;">
-                            <tbody>${filasTabla}</tbody>
-                        </table>
-                    </div>`;
-            }
-        });
-
-        return bloqueHtml;
+    function bandaIntensidad(v) {
+        if (v < 10) return '0-10';
+        if (v < 20) return '10-20';
+        return '20+';
     }
 
-    const htmlViento = renderRegimenes('viento');
-    const htmlRacha  = renderRegimenes('racha');
+    // Indicador de fiabilidad por intensidad: NO es una correccion distinta (verificado que partir
+    // por intensidad apenas reduce el error de la recta), es solo el MAE real en cada banda, para
+    // avisar de que el margen de error crece con el viento aunque la formula sea la misma.
+    function maePorIntensidad(lista, modelo, paramKey) {
+        const predKey = paramKey === 'viento' ? 'mediaPred' : 'rachaPred';
+        const realKey = paramKey === 'viento' ? 'viento' : 'racha';
+        const bandas = { '0-10': [], '10-20': [], '20+': [] };
+        lista.forEach(it => {
+            const pred = it.modelos[modelo][predKey];
+            const real = it.real[realKey];
+            if (pred === null || isNaN(pred) || real === null || isNaN(real)) return;
+            bandas[bandaIntensidad(pred)].push(Math.abs(pred - real));
+        });
+        const out = {};
+        Object.keys(bandas).forEach(b => {
+            const errs = bandas[b];
+            out[b] = errs.length > 0 ? (errs.reduce((s, v) => s + v, 0) / errs.length) : null;
+        });
+        return out;
+    }
 
-    if (!htmlViento && !htmlRacha) {
-        divFormula.innerHTML = "<p style='color:#64748b; font-size:0.9rem; margin:0;'>Not enough samples with valid orientation data for the current filters.</p>";
+    // Desglose horario: solo diagnostico visual (la reduccion de error al partir por hora
+    // es debil, 0.2%-2.5% segun horizonte), no se usa para generar una formula distinta.
+    function desglosePorHora(lista, modelo, paramKey) {
+        const horas = [...new Set(lista.map(it => it.hora).filter(h => h !== null))].sort((a, b) => a - b);
+        return horas.map(h => {
+            const r = calcRegresion(lista.filter(it => it.hora === h), modelo, paramKey);
+            return `${h}h: n=${r.n}${r.n >= 10 ? ` (R²=${(r.r2 * 100).toFixed(0)}%)` : ''}`;
+        }).join(' &nbsp; ');
+    }
+
+    function filaFormula(modelo, paramKey, listaHorizonte) {
+        const r = calcRegresion(listaHorizonte, modelo, paramKey);
+
+        if (r.n < UMBRAL_MIN_N) {
+            if (r.n === 0) return '';
+            return `<tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 4px 6px; width: 78px;"><span class="badge ${badgeClase[modelo]}">${modelo}</span></td>
+                <td colspan="3" style="padding: 4px 6px; color: #94a3b8; font-size: 0.8rem; font-style: italic;">
+                    Insufficient samples (n=${r.n}, needs ${UMBRAL_MIN_N}+)
+                </td>
+            </tr>`;
+        }
+
+        const signoB = r.b >= 0 ? `+ ${r.b.toFixed(1)}` : `- ${Math.abs(r.b).toFixed(1)}`;
+        const mae = maePorIntensidad(listaHorizonte, modelo, paramKey);
+        const maeTxt = ['0-10', '10-20', '20+'].map(b => mae[b] !== null ? mae[b].toFixed(1) : '-').join(' / ');
+        const horaTxt = desglosePorHora(listaHorizonte, modelo, paramKey);
+
+        return `<tr style="border-bottom: 1px solid #f1f5f9; vertical-align: top;">
+            <td style="padding: 6px 6px; width: 78px;"><span class="badge ${badgeClase[modelo]}">${modelo}</span></td>
+            <td style="padding: 6px 6px;">
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82rem; font-weight: 600; color: #1e293b;">
+                    Actual = (${r.m.toFixed(2)} × Forecast) ${signoB}
+                </div>
+                <div style="font-weight:400; color:#94a3b8; font-size:0.72rem; margin-top:3px;">
+                    Reliability by intensity — MAE (0-10 / 10-20 / 20+ km/h): ${maeTxt}
+                </div>
+                <details style="margin-top:4px;">
+                    <summary style="cursor:pointer; color:#64748b; font-size:0.72rem; font-weight:500;">Hour-of-day breakdown (diagnostic only, not used for correction)</summary>
+                    <div style="font-size:0.72rem; color:#94a3b8; margin-top:3px;">${horaTxt || 'No hourly data'}</div>
+                </details>
+            </td>
+            <td style="padding: 6px 6px; text-align: right; color: #64748b; font-size: 0.78rem; white-space: nowrap;">R²=${(r.r2 * 100).toFixed(0)}%</td>
+            <td style="padding: 6px 6px; text-align: right; color: #94a3b8; font-size: 0.75rem; white-space: nowrap;">n=${r.n}</td>
+        </tr>`;
+    }
+
+    function bloqueHorizonte(h) {
+        let listaH = CRUCES[h] || [];
+        if (lugarSel !== 'todos') listaH = listaH.filter(it => it.lugar === lugarSel);
+        if (listaH.length === 0) return '';
+
+        const modelosH = MODELOS_POR_HORIZ[h] || MODELOS;
+
+        let filasViento = '', filasRacha = '';
+        modelosH.forEach(m => {
+            filasViento += filaFormula(m, 'viento', listaH);
+            filasRacha  += filaFormula(m, 'racha', listaH);
+        });
+
+        if (!filasViento && !filasRacha) return '';
+
+        return `
+        <details open style="margin-bottom: 14px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; background:#ffffff;">
+            <summary style="cursor:pointer; font-size: 0.95rem; font-weight: 700; color:#0f172a;">
+                ${horizLabel(h)} <span style="font-weight:500; color:#64748b; font-size:0.78rem;">(n=${listaH.length} cruces)</span>
+            </summary>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-top:10px;">
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 4px; margin-bottom: 8px;">💨 Average Wind</div>
+                    <table style="width:100%; border-collapse: collapse; margin:0;"><tbody>${filasViento || '<tr><td style="color:#94a3b8; font-size:0.8rem; padding:4px 6px;">No data</td></tr>'}</tbody></table>
+                </div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #9a3412; border-bottom: 2px solid #f97316; padding-bottom: 4px; margin-bottom: 8px;">💨 Maximum Gust</div>
+                    <table style="width:100%; border-collapse: collapse; margin:0;"><tbody>${filasRacha || '<tr><td style="color:#94a3b8; font-size:0.8rem; padding:4px 6px;">No data</td></tr>'}</tbody></table>
+                </div>
+            </div>
+        </details>`;
+    }
+
+    const bloques = HORIZ_KEYS.map(bloqueHorizonte).join('');
+
+    if (!bloques) {
+        divFormula.innerHTML = "<p style='color:#64748b; font-size:0.9rem; margin:0;'>Not enough samples for the current filter.</p>";
         divDetalle.innerHTML = "";
         return;
     }
 
-    const tituloOrigen = esGlobal 
+    const tituloOrigen = esGlobal
         ? `<div style="margin-bottom: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
-               <div style="font-size: 0.98rem; font-weight: 700; color: #0f172a;">🌐 18 GLOBAL FORMULAS MATRIX</div>
+               <div style="font-size: 0.98rem; font-weight: 700; color: #0f172a;">🌐 GLOBAL FORMULAS, BY HORIZON &amp; MODEL</div>
                <div style="font-size: 0.8rem; color: #475569; margin-top: 3px; line-height: 1.45;">
-                   Calculated across all takeoffs and weather stations based on the wind direction incidence at the takeoff. 
-                   These formulas are implemented in the <a href='https://flydecision.com/' target='_blank' style="color: #2563eb; font-weight: 600; text-decoration: underline;">Fly Decision</a> application and correct (optionally by checkbox in Settings menu) the original model data, adapting it more closely to the actual conditions at paragliding launch sites, according to the agreement between the forecast wind direction and the actual launch orientation(s).
+                   One formula per forecast horizon and model. The wind-incidence regime (headwind/crosswind/tailwind) split used previously was
+                   dropped after validation showed it reduced error by less than 1% — not statistically meaningful. Implemented in the
+                   <a href='https://flydecision.com/' target='_blank' style="color: #2563eb; font-weight: 600; text-decoration: underline;">Fly Decision</a>
+                   application to correct the original model data (optional, via checkbox in Settings menu).
                </div>
            </div>`
         : `<div style="margin-bottom: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">
                <div style="font-size: 0.98rem; font-weight: 700; color: #0f172a;">📍 SPECIFIC FORMULAS FOR: ${lugarSel}</div>
            </div>`;
 
-    divFormula.innerHTML = tituloOrigen +
-        `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px;">
-            <div style="background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                <div style="font-size: 0.92rem; font-weight: 700; color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 4px; margin-bottom: 10px;">
-                    💨 Average Wind
-                </div>
-                ${htmlViento || '<span style="color:#94a3b8; font-size:0.85rem;">No data</span>'}
-            </div>
-            <div style="background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                <div style="font-size: 0.92rem; font-weight: 700; color: #9a3412; border-bottom: 2px solid #f97316; padding-bottom: 4px; margin-bottom: 10px;">
-                    💨 Maximum Gust
-                </div>
-                ${htmlRacha || '<span style="color:#94a3b8; font-size:0.85rem;">No data</span>'}
-            </div>
-        </div>`;
-
-    divDetalle.innerHTML = "* R² (Coefficient of Determination) indicates the formula reliability with current sample size. If low, the model is more chaotic and cannot be credibly corrected with this system.";
+    divFormula.innerHTML = tituloOrigen + bloques;
+    divDetalle.innerHTML = "* R² indicates formula reliability with current sample size. The intensity breakdown (MAE by 0-10 / 10-20 / 20+ km/h band) is a reliability indicator only — validation showed it does not meaningfully change (m, b), so it is not used to split the correction. The hour-of-day breakdown is diagnostic for the same reason.";
 }
 </script>
 </body>
