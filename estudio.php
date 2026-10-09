@@ -424,8 +424,8 @@ if ($logExists) {
     }
 }
 
-if (!$logExists) {
-    fputcsv($logHandle, [
+// Cabecera esperada: UNA sola definición, usada para crear el CSV y para vigilar el existente
+$cabeceraEsperada = [
         'momento_captura',
         'id_despegue',
         'id_baliza',
@@ -463,7 +463,33 @@ if (!$logExists) {
         '48h_ecmwf10_media', '48h_ecmwf10_direccion', '72h_ecmwf10_media', '72h_ecmwf10_direccion',
         '96h_ecmwf10_media', '96h_ecmwf10_direccion', '120h_ecmwf10_media', '120h_ecmwf10_direccion',
         '144h_ecmwf10_media', '144h_ecmwf10_direccion'
-    ], ';');
+];
+
+if (!$logExists) {
+    fputcsv($logHandle, $cabeceraEsperada, ';');
+} else {
+    // 🛡️ Vigilancia de cabecera: si el script escribe más columnas de las que declara el CSV,
+    // el dashboard descarta esas filas en silencio. Solo AVISAMOS (no reescribimos el CSV
+    // aquí: sustituir el archivo con $logHandle abierto haría que las filas nuevas se
+    // escribieran en el archivo viejo y se perdieran).
+    $hCab = @fopen($fileLog, 'r');
+    $cabeceraCsv = $hCab ? fgetcsv($hCab, 0, ';') : false;
+    if ($hCab) fclose($hCab);
+
+    $aviso = null;
+    if (!is_array($cabeceraCsv)) {
+        $aviso = "no se pudo leer la cabecera del CSV";
+    } elseif (count($cabeceraCsv) < count($cabeceraEsperada)) {
+        $aviso = "el CSV declara " . count($cabeceraCsv) . " columnas pero este script escribe " . count($cabeceraEsperada)
+               . ": las filas nuevas NO se leerán en el dashboard hasta que actualices la cabecera del CSV";
+    } elseif (array_slice($cabeceraCsv, 0, count($cabeceraEsperada)) !== $cabeceraEsperada) {
+        $aviso = "los nombres/orden de las columnas de la cabecera del CSV no coinciden con los del script";
+    }
+    if ($aviso !== null) {
+        $msg = date('Y-m-d H:i:s') . " [estudio] CABECERA: " . $aviso;
+        @file_put_contents(__DIR__ . '/estudio_alertas.log', $msg . PHP_EOL, FILE_APPEND | LOCK_EX);
+        echo $msg . PHP_EOL;
+    }
 }
 
 // =========================================================================

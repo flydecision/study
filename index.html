@@ -361,8 +361,8 @@
                 <p>For every valid comparison, models are ranked by their absolute error (MAE):</p>
                 <ul style="margin-top: 6px; margin-bottom: 6px;">
                     <li><b>1st place (best)</b> = 1 point</li>
-                    <li><b>2nd place</b> = 2 points</li>
-                    <li><b>3rd place (worst)</b> = 3 points</li>
+                    <li><b>Last place (worst)</b> = 3 points</li>
+                    <li>Intermediate places are scaled proportionally, so a 2-model comparison (+2 and +3 days) weighs the same as a 3-model one: 1st = 1, 2nd = 3.</li>
                 </ul>
                 <p>A lower score is better (a perfect score of <b>1.00</b> means the model won every single comparison). The number in parentheses <b>(matches)</b> indicates how many valid comparisons were made to calculate this average.</p>
                 <p>This overall ranking already takes into account that AromeHD does not compete in the +2 and +3 days horizons, and ICON-EU does not go beyond +3 days. From +4 to +6 days only ECMWF is evaluated (no model comparison, just how its accuracy decays), so those horizons are excluded from the overall ranking.</p>
@@ -669,6 +669,7 @@ function parseCSV(text) {
 
     const headers = parseCSVLine(logicalLines[0], ';');
     const rows = [];
+    let descartadas = 0, ejemplo = null;
     for (let i = 1; i < logicalLines.length; i++) {
         const values = parseCSVLine(logicalLines[i], ';');
         // 45 = nº de columnas del CSV original; las filas antiguas (45 o 49 campos) siguen siendo válidas
@@ -676,8 +677,12 @@ function parseCSV(text) {
             const obj = {};
             headers.forEach((h, idx) => { obj[h] = values[idx] ?? ''; });
             rows.push(obj);
+        } else {
+               descartadas++;
+               if (!ejemplo) ejemplo = `línea ${i + 1}: ${values.length} campos (cabecera: ${headers.length}, mínimo: 45)`;
         }
     }
+    if (descartadas > 0) console.warn(`parseCSV: ${descartadas} filas descartadas de ${logicalLines.length - 1}. Primera: ${ejemplo}`);
     return rows;
 }
 
@@ -902,6 +907,24 @@ function getBalizaUrl(red, id) {
     }
 }
 
+// Realidad más cercana en el tiempo a targetMs. 'arr' debe estar ordenado por fecha.
+// Búsqueda binaria: O(log n) en vez de recorrer todas las observaciones.
+function realMasCercana(arr, targetMs) {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid].date.getTime() < targetMs) lo = mid + 1; else hi = mid;
+    }
+    // 'lo' = primer elemento con fecha >= objetivo; los candidatos son lo-1 y lo
+    let best = null, bestDiff = Infinity;
+    for (const i of [lo - 1, lo]) {
+        if (i < 0 || i >= arr.length) continue;
+        const diff = Math.abs(targetMs - arr[i].date.getTime());
+        if (diff < bestDiff) { bestDiff = diff; best = arr[i]; }
+    }
+    return { real: best, diff: bestDiff };
+}
+
 function procesarDatos(rows) {
     // 1. Guardamos todas las realidades en una lista por despegue
     const realList = {};
@@ -909,8 +932,9 @@ function procesarDatos(rows) {
         const realDate = parseToDate(r.real_momento);
         const vientoReal = parseFloat(r.real_media);
         if (realDate && !isNaN(vientoReal)) {
-            if (!realList[r.id_despegue]) realList[r.id_despegue] = [];
-            realList[r.id_despegue].push({
+            const kReal = r.id_despegue + '|' + (r.id_baliza || '');
+            if (!realList[kReal]) realList[kReal] = [];
+            realList[kReal].push({
                 date: realDate,
                 viento: vientoReal,
                 racha: parseFloat(r.real_racha),
@@ -918,6 +942,9 @@ function procesarDatos(rows) {
             });
         }
     });
+
+    // Ordenamos cada lista por fecha (necesario para la búsqueda binaria)
+    Object.values(realList).forEach(arr => arr.sort((a, b) => a.date - b.date));
 
     CRUCES = Object.fromEntries(HORIZ_KEYS.map(k => [k, []]));
 
@@ -933,19 +960,11 @@ function procesarDatos(rows) {
             const forecastDate = parseToDate(r[`${h}h_pronostico_momento`]);
             if (!forecastDate) return;
 
-            const reals = realList[idDespegue];
+            const reals = realList[idDespegue + '|' + baliza];
             if (!reals || reals.length === 0) return;
 
             // Buscar la realidad más cercana a la fecha del pronóstico
-            let closestReal = null;
-            let minDiff = Infinity;
-            reals.forEach(realObj => {
-                const diff = Math.abs(forecastDate.getTime() - realObj.date.getTime());
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestReal = realObj;
-                }
-            });
+            const { real: closestReal, diff: minDiff } = realMasCercana(reals, forecastDate.getTime());
 
             // Tolerancia de 90 minutos sería 5400000 (5.400.000 ms) y entraría Áger pero es demasiado, así que voy a poner 20 min
             // Si la realidad más cercana está a más de 20 min del pronóstico, la descartamos.
@@ -1075,6 +1094,11 @@ function statsModelo(list, modelo, paramKey) {
     return { mae: media(errs), bias: media(biases), rmse: rmse, n: validErrs.length };
 }
 
+function soloComunes(list, h, paramKey) {
+    const ms = MODELOS_POR_HORIZ[h] || MODELOS, k = PARAMS[paramKey];
+    return list.filter(it => ms.every(m => it.modelos[m][k] !== null && !isNaN(it.modelos[m][k])));
+}
+
 function fmtDir(mae, bias, prefix = '', rmse = null, n = null) {
     if (mae === null) return '-';
     const b = bias !== null ? `${bias > 0 ? '+' : ''}${Math.round(bias)}°` : '-';
@@ -1145,11 +1169,13 @@ function renderResumenGlobal() {
 
     horizKeys.forEach(h => {
         paramKeys.forEach(p => {
-            const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(CRUCES[h], m, p) }))
+            const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(soloComunes(CRUCES[h], h, p), m, p) }))
                 .filter(s => s.mae !== null)
                 .sort((a, b) => a.mae - b.mae);
             if (rk.length < 2) return; // sin competición no hay posición que puntuar
-            rk.forEach((s, i) => { puntos[s.modelo].suma += (i + 1); puntos[s.modelo].celdas += 1; });
+            // Posición normalizada a la escala 1-3: 1 = ganar siempre, 3 = ser último siempre,
+            // sea cual sea el nº de modelos que compiten en esa celda (2 o 3).
+            rk.forEach((s, i) => { puntos[s.modelo].suma += 1 + (i / (rk.length - 1)) * 2; puntos[s.modelo].celdas += 1; });
         });
     });
     const ranking_general = MODELOS
@@ -1256,9 +1282,9 @@ function renderTablaHorizontes() {
         }
         const stats = {};
         MODELOS.forEach(m => { 
-            const v = statsModelo(list, m, 'viento');
-            const r = statsModelo(list, m, 'racha');
-            const d = statsModelo(list, m, 'dir');
+            const v = statsModelo(soloComunes(list, h, 'viento'), m, 'viento');
+            const r = statsModelo(soloComunes(list, h, 'racha'), m, 'racha');
+            const d = statsModelo(soloComunes(list, h, 'dir'), m, 'dir');
             const score = calcularNotaGlobal(v.mae, r.mae, d.mae);
             stats[m] = { v, r, d, score };
         });
@@ -1316,10 +1342,18 @@ function actualizarVistaDetalle() {
 function renderCharts(list) {
     const lugares = [...new Set(list.map(it => it.lugar))];
 
+    // Agrupamos la lista UNA sola vez (antes se re-filtraba entera por cada lugar, día y modelo)
+    const agrupar = clave => {
+        const g = new Map();
+        list.forEach(it => { const k = it[clave]; if (!g.has(k)) g.set(k, []); g.get(k).push(it); });
+        return g;
+    };
+    const porLugar = agrupar('lugar');
+
     // Sesgo viento por lugar
     const dsBiasViento = MODELOS.map(m => ({
         label: m,
-        data: lugares.map(l => { const s = statsModelo(list.filter(it => it.lugar === l), m, 'viento'); return s.bias; }),
+        data: lugares.map(l => { const s = statsModelo(porLugar.get(l), m, 'viento'); return s.bias; }),
         backgroundColor: coloresModelo[m]
     }));
     if (charts.bias) charts.bias.destroy();
@@ -1332,7 +1366,7 @@ function renderCharts(list) {
     // Sesgo racha por lugar
     const dsBiasRacha = MODELOS.map(m => ({
         label: m,
-        data: lugares.map(l => { const s = statsModelo(list.filter(it => it.lugar === l), m, 'racha'); return s.bias; }),
+        data: lugares.map(l => { const s = statsModelo(porLugar.get(l), m, 'racha'); return s.bias; }),
         backgroundColor: coloresModelo[m]
     }));
     if (charts.biasRacha) charts.biasRacha.destroy();
@@ -1344,11 +1378,12 @@ function renderCharts(list) {
 
     // Histórico de error de viento por día
     const dias = [...new Set(list.map(it => it.fecha))].sort();
+    const porDia = agrupar('fecha');
     const dsHistViento = MODELOS.map(m => {
         const color = coloresModelo[m];
         return {
             label: m,
-            data: dias.map(d => { const s = statsModelo(list.filter(it => it.fecha === d), m, 'viento'); return s.mae; }),
+            data: dias.map(d => { const s = statsModelo(porDia.get(d), m, 'viento'); return s.mae; }),
             borderColor: color.replace('0.75', '1'),
             backgroundColor: color,
             tension: 0.15, fill: false
@@ -1366,7 +1401,7 @@ function renderCharts(list) {
         const color = coloresModelo[m];
         return {
             label: m,
-            data: dias.map(d => { const s = statsModelo(list.filter(it => it.fecha === d), m, 'racha'); return s.mae; }),
+            data: dias.map(d => { const s = statsModelo(porDia.get(d), m, 'racha'); return s.mae; }),
             borderColor: color.replace('0.75', '1'),
             backgroundColor: color,
             tension: 0.15, fill: false
@@ -1384,7 +1419,7 @@ function renderCharts(list) {
         const color = coloresModelo[m];
         return {
             label: m,
-            data: dias.map(d => { const s = statsModelo(list.filter(it => it.fecha === d), m, 'dir'); return s.mae; }),
+            data: dias.map(d => { const s = statsModelo(porDia.get(d), m, 'dir'); return s.mae; }),
             borderColor: color.replace('0.75', '1'),
             backgroundColor: color,
             tension: 0.15, fill: false

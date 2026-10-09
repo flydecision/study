@@ -34,7 +34,7 @@
 527;ESCAT0800000008572B;Bellmunt;180,158,135;balizas_meteoclimatic_6h.json;https://flydecision.com/?lat=42.0999&lon=2.2937&zoom=14
 582;ESCAT0800000025716A;Pedraforca;270,248;balizas_meteoclimatic_6h.json;https://flydecision.com/?lat=42.2375&lon=1.7038&zoom=14
 411;ESCYL0900000009589B;Castro Grande;45,0,315;balizas_meteoclimatic_6h.json;https://flydecision.com/?lat=43.0910&lon=-3.2230&zoom=14
-1005;6081001;Thorenc - Col de Bleyne;180,135,225,270;balizas_meteofrance_6h.json;https://flydecision.com/?lat=43.8103&lon=6.9035&zoom=14
+1005;06081001;Thorenc - Col de Bleyne;180,135,225,270;balizas_meteofrance_6h.json;https://flydecision.com/?lat=43.8137&lon=6.8113&zoom=14
 657;10172;Las Nieves;270;balizas_meteogalicia_6h.json;https://flydecision.com/?lat=42.1337&lon=-8.4132&zoom=14
 663;10133;Xesteiras;180;balizas_meteogalicia_6h.json;https://flydecision.com/?lat=42.6750&lon=-8.5871&zoom=14
 731;GN23;Arangoiti;180,338,315,0;balizas_meteonavarra_6h.json;https://flydecision.com/?lat=42.6449&lon=-1.1878&zoom=14
@@ -86,6 +86,7 @@
 878;2064;Coll de Rates;0,180;balizas_pioupiou_6h.json;https://flydecision.com/?lat=38.7230&lon=-0.0790&zoom=14
 925;2002;Petrés;180,135,90;balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.6875&lon=-0.3022&zoom=14
 932;2004;Villar del Arzobispo (Cerro Castellar);135,90;balizas_pioupiou_6h.json;https://flydecision.com/?lat=39.7280&lon=-0.8512&zoom=14
+967;1376;Pla d'Adet;45,0,315;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8135&lon=0.2982&zoom=14
 1070;1588;Col de la Core;270,315;balizas_pioupiou_6h.json;https://flydecision.com/?lat=42.8613&lon=1.1079&zoom=14
 253;2079;Resquilones;0,45;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.3971&lon=-4.8308&zoom=14
 1008;373;Moustiers - Courchon;225,270;balizas_pioupiou_6h.json;https://flydecision.com/?lat=43.8433&lon=6.2303&zoom=14
