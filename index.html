@@ -428,16 +428,18 @@
                 <tbody id="tabla-ecmwf10-horizontes"><tr><td colspan="6" style="text-align:center;">Loading…</td></tr></tbody>
             </table>
             <h3 style="margin-top:22px; font-size:1.1rem;">By altitude difference (takeoff altitude − model terrain elevation)</h3>
-            <div class="section-desc">Average wind, all horizons pooled. Tests whether the 10 m wind loses accuracy as the takeoff sits higher above the terrain of the model's grid cell.</div>
+            <div class="section-desc">Average wind and direction, all horizons pooled. Tests whether the 10 m wind loses accuracy as the takeoff sits higher above the terrain of the model's grid cell.</div>
             <table>
                 <thead>
                     <tr>
-                        <th>Altitude difference</th><th>n</th><th>Takeoffs</th>
+                        <th>Altitude difference</th><th>n (wind / dir)</th><th>Takeoffs</th>
                         <th>Average – Interpolated</th>
                         <th>Average – 10 m</th>
+                        <th>Direction – Interpolated</th>
+                        <th>Direction – 10 m</th>
                     </tr>
                 </thead>
-                <tbody id="tabla-ecmwf10-altitud"><tr><td colspan="5" style="text-align:center;">Loading…</td></tr></tbody>
+                <tbody id="tabla-ecmwf10-altitud"><tr><td colspan="7" style="text-align:center;">Loading…</td></tr></tbody>
             </table>
         </div>
 
@@ -1050,6 +1052,36 @@ function media(arr) {
     return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
+// Validación fuera de muestra: ajusta la recta con el ~70% de días más antiguos (por fecha de la
+// OBSERVACIÓN, para no filtrar información del futuro) y mide el error sobre el ~30% más reciente,
+// datos que el ajuste nunca ha visto. Devuelve null si aún no hay muestra suficiente.
+function validarFueraDeMuestra(list, modelo, paramKey) {
+    const predKey = paramKey === 'viento' ? 'mediaPred' : 'rachaPred';
+    const realKey = paramKey === 'viento' ? 'viento' : 'racha';
+    const diaObs = it => {
+        const d = it.real.date;
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    const ok = list.filter(it => {
+        const p = it.modelos[modelo][predKey], r = it.real[realKey];
+        return p !== null && !isNaN(p) && r !== null && !isNaN(r);
+    });
+    const dias = [...new Set(ok.map(diaObs))].sort();
+    if (dias.length < 10) return null;
+    const corte = dias[Math.floor(dias.length * 0.7)];      // primer día del tramo de test
+    const train = ok.filter(it => diaObs(it) < corte);
+    const test  = ok.filter(it => diaObs(it) >= corte);
+    const reg = calcRegresion(train, modelo, paramKey);
+    if (reg.n < 30 || test.length < 30) return null;
+    let eRaw = 0, eCor = 0;
+    test.forEach(it => {
+        const p = it.modelos[modelo][predKey], r = it.real[realKey];
+        eRaw += Math.abs(p - r);
+        eCor += Math.abs(Math.max(0, reg.m * p + reg.b) - r);   // el viento no puede ser negativo
+    });
+    return { nTrain: reg.n, nTest: test.length, maeRaw: eRaw / test.length, maeCor: eCor / test.length, corte };
+}
+
 // Calcula la regresión lineal (y = mx + b) para un modelo y parámetro
 function calcRegresion(list, modelo, paramKey) {
     const predKey = paramKey === 'viento' ? 'mediaPred' : (paramKey === 'racha' ? 'rachaPred' : 'dirPred');
@@ -1256,17 +1288,21 @@ function renderComparativaEcmwf() {
     const conAlt = HORIZ_KEYS.flatMap(k => CRUCES[k]).filter(it => it.altDiff !== null);
     let htmlA = '';
     bins.forEach(b => {
-        const lw = pareadas(conAlt.filter(it => b.test(it.altDiff)), 'mediaErr');
-        if (lw.length === 0) {
-            htmlA += `<tr><td><b>${b.label}</b></td><td colspan="4" style="text-align:center;">No data yet</td></tr>`;
+        const enBin = conAlt.filter(it => b.test(it.altDiff));
+        const lw = pareadas(enBin, 'mediaErr');
+        const ld = pareadas(enBin, 'dirErr');
+        if (lw.length === 0 && ld.length === 0) {
+            htmlA += `<tr><td><b>${b.label}</b></td><td colspan="6" style="text-align:center;">No data yet</td></tr>`;
             return;
         }
         const sI = statsModelo(lw, 'ECMWF', 'viento'), s10 = statsModelo(lw, 'ECMWF-10m', 'viento');
-        const g = ganador(sI, s10);
+        const dI = statsModelo(ld, 'ECMWF', 'dir'),    d10 = statsModelo(ld, 'ECMWF-10m', 'dir');
+        const g = ganador(sI, s10), gd = ganador(dI, d10);
         const nDesp = new Set(lw.map(it => it.idDespegue)).size;
         htmlA += `<tr>
-            <td><b>${b.label}</b></td><td>${lw.length}</td><td>${nDesp}</td>
+            <td><b>${b.label}</b></td><td>${lw.length} / ${ld.length}</td><td>${nDesp}</td>
             ${celdaNum(sI, g === 'interp')}${celdaNum(s10, g === 'diez')}
+            ${celdaDir(dI, gd === 'interp')}${celdaDir(d10, gd === 'diez')}
         </tr>`;
     });
     tbA.innerHTML = htmlA;
@@ -1597,6 +1633,19 @@ function renderFormulaCorreccion(lugarSel) {
         const maeTxt = ['0-10', '10-20', '20+'].map(b => mae[b] !== null ? mae[b].toFixed(1) : '-').join(' / ');
         const horaTxt = desglosePorHora(listaHorizonte, modelo, paramKey);
 
+        // Validación fuera de muestra: ¿la corrección mejora de verdad con datos que no ha visto?
+        const val = validarFueraDeMuestra(listaHorizonte, modelo, paramKey);
+        let valHtml;
+        if (!val) {
+            valHtml = `<div style="color:#94a3b8; font-size:0.72rem; margin-top:3px;">Unseen-data check: not enough days yet</div>`;
+        } else {
+            const mejora = (val.maeRaw - val.maeCor) / val.maeRaw * 100;
+            const [icono, color] = mejora >= 3 ? ['✅', '#15803d'] : (mejora <= -3 ? ['⚠️', '#b91c1c'] : ['➖', '#64748b']);
+            valHtml = `<div style="font-size:0.74rem; margin-top:3px; color:${color}; font-weight:600;">
+                ${icono} Unseen data (fit on days before ${val.corte}, tested on ${val.nTest} later cases): MAE ${val.maeRaw.toFixed(2)} → ${val.maeCor.toFixed(2)} km/h (${mejora >= 0 ? '−' : '+'}${Math.abs(mejora).toFixed(0)}%)
+            </div>`;
+        }
+
         return `<tr style="border-bottom: 1px solid #f1f5f9; vertical-align: top;">
             <td style="padding: 6px 6px; width: 78px;"><span class="badge ${badgeClase[modelo]}">${modelo}</span></td>
             <td style="padding: 6px 6px;">
@@ -1606,6 +1655,7 @@ function renderFormulaCorreccion(lugarSel) {
                 <div style="font-weight:400; color:#94a3b8; font-size:0.72rem; margin-top:3px;">
                     Reliability by intensity — MAE (0-10 / 10-20 / 20+ km/h): ${maeTxt}
                 </div>
+                ${valHtml}
                 <details style="margin-top:4px;">
                     <summary style="cursor:pointer; color:#64748b; font-size:0.72rem; font-weight:500;">Hour-of-day breakdown (diagnostic only, not used for correction)</summary>
                     <div style="font-size:0.72rem; color:#94a3b8; margin-top:3px;">${horaTxt || 'No hourly data'}</div>
@@ -1672,7 +1722,7 @@ function renderFormulaCorreccion(lugarSel) {
            </div>`;
 
     divFormula.innerHTML = tituloOrigen + bloques;
-    divDetalle.innerHTML = "* R² indicates formula reliability with current sample size. The intensity breakdown (MAE by 0-10 / 10-20 / 20+ km/h band) is a reliability indicator only — validation showed it does not meaningfully change (m, b), so it is not used to split the correction. The hour-of-day breakdown is diagnostic for the same reason.";
+    divDetalle.innerHTML = "* Unseen-data check: the line is fitted on the oldest ~70% of days and its error is measured on the newest ~30%, which the fit never saw (✅ ≥3% better than the raw model, ➖ within ±3%, ⚠️ ≥3% worse). R² indicates formula reliability with current sample size. The intensity breakdown (MAE by 0-10 / 10-20 / 20+ km/h band) is a reliability indicator only — validation showed it does not meaningfully change (m, b), so it is not used to split the correction. The hour-of-day breakdown is diagnostic for the same reason.";
 }
 </script>
 </body>
