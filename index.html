@@ -443,6 +443,42 @@
             </table>
         </div>
 
+        <!-- ============ BASE DE NUBE vs METAR ============ -->
+        <div class="section-card" id="seccion-nubes">
+            <h2>☁️ Cloud Base: Forecast vs. METAR</h2>
+            <div class="section-desc">Experimental check of FlyDecision's <b>Cloud base</b> forecast (estimated from ICON-EU relative humidity on pressure levels, cloud from 95&nbsp;%) against the cloud layers reported in the METAR of nearby airports. Each airport is paired with the closest takeoff within 20&nbsp;km and with less than 500&nbsp;m of altitude difference. Only ceilings (BKN, OVC or vertical visibility VV) are compared, since the forecast looks for cloud layers covering the sky, not isolated cumulus (FEW/SCT). Heights are converted to altitude above sea level (MSL). As CAVOK/NSC only guarantee no cloud up to about 1500&nbsp;m above the airport, the yes/no check uses that window. This section only accumulates data from the day it was deployed.</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Horizon</th><th>n</th>
+                        <th>Correct (low ceiling yes/no)</th>
+                        <th>Ceilings detected</th>
+                        <th>False alarms</th>
+                        <th>Base error (both see a ceiling)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-nubes-horizontes"><tr><td colspan="6" style="text-align:center;">Loading…</td></tr></tbody>
+            </table>
+            <h3 style="margin-top:22px; font-size:1.1rem;">By airport (all horizons pooled)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Airport (METAR)</th><th>Takeoff</th><th>Distance / Alt. diff.</th><th>n</th>
+                        <th>Correct</th><th>Base error</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-nubes-aeropuertos"><tr><td colspan="6" style="text-align:center;">Loading…</td></tr></tbody>
+            </table>
+            <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; color: #5a6473;">
+                <b>ℹ️ How to read it:</b>
+                <p style="margin: 8px 0 4px;">• <b>Correct:</b> % of hours where the forecast and the METAR agree on whether there is a ceiling below ~1500 m above the airport.</p>
+                <p style="margin: 0 0 4px;">• <b>Ceilings detected:</b> of the hours with a real ceiling in that window, % that the forecast also predicted.</p>
+                <p style="margin: 0 0 4px;">• <b>False alarms:</b> of the hours where the forecast predicted a ceiling, % where the METAR did not report one.</p>
+                <p style="margin: 0 0 8px;">• <b>Base error:</b> MAE and MBE (forecast − METAR) in metres, only when both see a ceiling. A negative MBE means the forecast puts the base too low.</p>
+                <p style="margin: 0 0 8px;">Keep in mind that the METAR measures a single point (the airport) while the model gives the average of a ~7 km cell, so some disagreement is expected even with a perfect forecast.</p>
+            </div>
+        </div>
+
         <!-- ============ FILTROS + GRÁFICAS + DETALLE ============ -->
         <div class="section-card">
             <h2>🔍 Explore by Takeoff, Horizon, and Data Time</h2>
@@ -614,6 +650,7 @@ async function cargarEstudio() {
         renderResumenGlobal();
         renderTablaHorizontes();
         renderComparativaEcmwf();
+        cargarNubes(); // ☁️ independiente: si falta estudio_nubes.csv, la sección lo indica y el resto sigue
         actualizarVistaDetalle();
 
         document.getElementById('loading').style.display = 'none';
@@ -633,6 +670,105 @@ async function cargarEstudio() {
             `;
         }
     }
+}
+
+/* ---------------------------------------------------------------------
+ * ☁️ BASE DE NUBE vs METAR (estudio_nubes.csv)
+ * ------------------------------------------------------------------- */
+const NUBES_HORIZ = [6, 24, 48, 72, 96];
+const NUBES_VENTANA = 1500; // m sobre el aeropuerto que garantiza CAVOK/NSC
+
+// Techo del METAR en m MSL: capa más baja BKN/OVC/VV. null = sin techo; undefined = METAR sin información de nubes
+function techoMetar(nubes, elev) {
+    if (!nubes) return undefined;
+    let techo = null;
+    nubes.split(' ').forEach(c => {
+        const m = c.match(/^(BKN|OVC|VV)(\d{3})$/);
+        if (m) { const z = elev + Number(m[2]) * 30.48; if (techo === null || z < techo) techo = z; }
+    });
+    return techo;
+}
+
+async function cargarNubes() {
+    const tbH = document.getElementById('tabla-nubes-horizontes');
+    const tbA = document.getElementById('tabla-nubes-aeropuertos');
+    if (!tbH || !tbA) return;
+    const sinDatos = (tb, cols) => { tb.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;">No data yet</td></tr>`; };
+    let filas = [];
+    try {
+        const res = await fetch('estudio_nubes.csv?t=' + Date.now());
+        if (res.ok) {
+            const lineas = (await res.text()).replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim() !== '');
+            const cab = parseCSVLine(lineas[0] || '', ';');
+            filas = lineas.slice(1).map(l => { const v = parseCSVLine(l, ';'); const o = {}; cab.forEach((h, i) => o[h] = v[i] ?? ''); return o; });
+        }
+    } catch (e) { console.warn('Could not load estudio_nubes.csv', e); }
+    if (filas.length === 0) { sinDatos(tbH, 6); sinDatos(tbA, 6); return; }
+
+    // Realidad por aeropuerto: [ms, techo, elev]
+    const reales = {};
+    filas.forEach(f => {
+        const elev = Number(f.elev_aeropuerto);
+        const techo = techoMetar(f.real_nubes, elev);
+        if (!f.real_momento || techo === undefined) return;
+        (reales[f.icao] = reales[f.icao] || []).push({ ms: parseToDate(f.real_momento).getTime(), techo });
+    });
+
+    // Cruces previsión → METAR (±45 min)
+    const cruces = [];
+    filas.forEach(f => {
+        const elev = Number(f.elev_aeropuerto);
+        const lista = reales[f.icao] || [];
+        NUBES_HORIZ.forEach(h => {
+            const momento = f[`${h}h_pronostico_momento`], valor = f[`${h}h_base_nube`];
+            if (!momento || valor === '' || valor === undefined) return;
+            const ms = parseToDate(momento).getTime();
+            let real = null;
+            lista.forEach(r => { if (Math.abs(r.ms - ms) <= 2700000 && (!real || Math.abs(r.ms - ms) < Math.abs(real.ms - ms))) real = r; });
+            if (!real) return;
+            const v = Number(valor);
+            const prev = (v === -1) ? null : Math.max(v, elev); // -1 = sin nubes bajas; por debajo del aeropuerto no se puede comparar
+            const limite = elev + NUBES_VENTANA;
+            cruces.push({
+                h, icao: f.icao, f,
+                prevSi: prev !== null && prev <= limite,
+                realSi: real.techo !== null && real.techo <= limite,
+                err: (prev !== null && real.techo !== null && prev <= limite && real.techo <= limite) ? prev - real.techo : null
+            });
+        });
+    });
+
+    const pct = (a, b) => b > 0 ? `${Math.round(100 * a / b)}&nbsp;% <span style="color:#888;">(${a}/${b})</span>` : '–';
+    const errTxt = l => {
+        const e = l.map(c => c.err).filter(x => x !== null);
+        if (e.length === 0) return '–';
+        const mae = e.reduce((s, x) => s + Math.abs(x), 0) / e.length, mbe = e.reduce((s, x) => s + x, 0) / e.length;
+        return `MAE ${Math.round(mae)} m · MBE ${mbe > 0 ? '+' : ''}${Math.round(mbe)} m <span style="color:#888;">(n=${e.length})</span>`;
+    };
+    const resumen = l => ({
+        ok: l.filter(c => c.prevSi === c.realSi).length,
+        realSi: l.filter(c => c.realSi).length, detect: l.filter(c => c.realSi && c.prevSi).length,
+        prevSi: l.filter(c => c.prevSi).length, falsas: l.filter(c => c.prevSi && !c.realSi).length
+    });
+
+    let htmlH = '';
+    NUBES_HORIZ.forEach(h => {
+        const l = cruces.filter(c => c.h === h);
+        if (l.length === 0) { htmlH += `<tr><td><b>+${h}h</b></td><td colspan="5" style="text-align:center;">No data yet</td></tr>`; return; }
+        const r = resumen(l);
+        htmlH += `<tr><td><b>+${h}h</b></td><td>${l.length}</td><td>${pct(r.ok, l.length)}</td><td>${pct(r.detect, r.realSi)}</td><td>${pct(r.falsas, r.prevSi)}</td><td>${errTxt(l)}</td></tr>`;
+    });
+    tbH.innerHTML = htmlH;
+
+    const porAeropuerto = {};
+    cruces.forEach(c => (porAeropuerto[c.icao] = porAeropuerto[c.icao] || []).push(c));
+    const icaos = Object.keys(porAeropuerto).sort((a, b) => porAeropuerto[b].length - porAeropuerto[a].length);
+    if (icaos.length === 0) { sinDatos(tbA, 6); return; }
+    tbA.innerHTML = icaos.map(icao => {
+        const l = porAeropuerto[icao], f = l[0].f, r = resumen(l);
+        const desn = Number(f.altitud_despegue) - Number(f.elev_aeropuerto);
+        return `<tr><td><b>${icao}</b> ${f.aeropuerto}</td><td>${f.despegue} (${f.altitud_despegue} m)</td><td>${f.distancia_km} km / ${desn > 0 ? '+' : ''}${desn} m</td><td>${l.length}</td><td>${pct(r.ok, l.length)}</td><td>${errTxt(l)}</td></tr>`;
+    }).join('');
 }
 
 // Parser de CSV con ; que respeta comillas (campos con ; o saltos de línea embebidos)
