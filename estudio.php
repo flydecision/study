@@ -669,3 +669,10 @@ fclose($logHandle);
 $executionTime = round(microtime(true) - $startTime, 2);
 
 echo "$fechaCaptura | Read: " . count($mapeos) . " | Written: $filasEscritas | Omitted as duplicates: $filasOmitidas | Execution time: {$executionTime}s\n";
+
+// ☁️ Estudio de base de nube frente al METAR (escribe estudio_nubes.csv). Aparte del de viento: si falla, no afecta a estudio.csv.
+try {
+    require __DIR__ . '/estudio_nubes.php';
+} catch (Throwable $e) {
+    echo "☁️ estudio_nubes: error " . $e->getMessage() . "\n";
+}
