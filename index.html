@@ -1004,7 +1004,11 @@ function alternarMapaGanador(activar) {
 // 🗺️ Deslizadores de horizonte y hora de toma del mapa: actualizan el texto y repintan los puntos
 function cambiarFiltroMapaGanador() {
     const h = HORIZ_MAPA[+document.getElementById('rangoHorizonteMapa').value];
-    const hora = HORAS_MAPA[+document.getElementById('rangoHoraMapa').value];
+    // +6 h solo tiene datos en las tomas de 9, 11 y 13 h: el deslizador de hora se limita a esas
+    const rangoHora = document.getElementById('rangoHoraMapa');
+    rangoHora.max = h === '6' ? 3 : 6;
+    if (+rangoHora.value > +rangoHora.max) rangoHora.value = rangoHora.max;
+    const hora = HORAS_MAPA[+rangoHora.value];
     document.getElementById('txtHorizonteMapa').textContent = horizLabel(h);
     document.getElementById('txtHoraMapa').textContent = hora === 'todas' ? 'All times' : `${String(hora).padStart(2, '0')}:00 h`;
     if (!mapaDespegues) return;
