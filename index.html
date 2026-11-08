@@ -169,6 +169,9 @@
     }
     .mapa-ganador-opcion { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; cursor: pointer; }
     .mapa-ganador-opcion input { width: 18px; height: 18px; cursor: pointer; }
+    #mapa-ganador-controles { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-bottom: 10px; }
+    .mapa-deslizador { display: flex; flex-direction: column; gap: 4px; min-width: 240px; flex: 1; max-width: 420px; }
+    .mapa-deslizador input[type=range] { width: 100%; cursor: pointer; }
     #mapa-ganador-leyenda { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; }
     #mapa-ganador-leyenda .punto { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #fff; box-shadow: 0 0 0 1px #94a3b8; margin-right: 6px; vertical-align: middle; }
     .leaflet-popup-content a {
@@ -349,8 +352,18 @@
             <div class="section-desc">Click a marker to open that takeoff in FlyDecision.com.</div>
             <label class="mapa-ganador-opcion">
                 <input type="checkbox" id="chkMapaGanador" onchange="alternarMapaGanador(this.checked)">
-                Show each takeoff as a dot colored by its winning model (+1 day, Global Score)
+                Show each takeoff as a dot colored by its winning model (Global Score)
             </label>
+            <div id="mapa-ganador-controles" style="display:none;">
+                <div class="mapa-deslizador">
+                    <label for="rangoHorizonteMapa">Horizon: <b id="txtHorizonteMapa">+1 day</b></label>
+                    <input type="range" id="rangoHorizonteMapa" min="0" max="6" step="1" value="1" oninput="cambiarFiltroMapaGanador()">
+                </div>
+                <div class="mapa-deslizador">
+                    <label for="rangoHoraMapa">Data time: <b id="txtHoraMapa">All times</b></label>
+                    <input type="range" id="rangoHoraMapa" min="0" max="6" step="1" value="0" oninput="cambiarFiltroMapaGanador()">
+                </div>
+            </div>
             <div id="mapa-ganador-leyenda" style="display:none;"></div>
             <div id="mapa-despegues"></div>
         </div>
@@ -923,19 +936,25 @@ function renderMapaDespegues(puntos) {
     setTimeout(() => mapaDespegues.invalidateSize(), 100);
 }
 
+// 🗺️ Valores de los deslizadores del mapa (posición 0..6)
+const HORIZ_MAPA = ['6', '24', '48', '72', '96', '120', '144'];
+const HORAS_MAPA = ['todas', 9, 11, 13, 15, 17, 19];
+
 // 🗺️ Modelo ganador de cada despegue: misma nota global (calcularNotaGlobal) que la columna
-// «Overall Winner» de la tabla por despegue con el horizonte +1 día (el único en el que compiten los 3 modelos).
-// Devuelve { idDespegue: { modelo, nota } }.
-function ganadorPorDespegue() {
+// «Overall Winner» de la tabla por despegue, para un horizonte y hora de toma ('todas' = todas).
+// Solo compiten los modelos de ese horizonte (MODELOS_POR_HORIZ). Devuelve { idDespegue: { modelo, nota } }.
+function ganadorPorDespegue(h = '24', hora = 'todas') {
     const porDespegue = new Map();
-    (CRUCES['24'] || []).forEach(it => {
+    const modelosH = MODELOS_POR_HORIZ[h] || MODELOS;
+    (CRUCES[h] || []).forEach(it => {
+        if (hora !== 'todas' && it.hora !== hora) return;
         if (!porDespegue.has(it.idDespegue)) porDespegue.set(it.idDespegue, []);
         porDespegue.get(it.idDespegue).push(it);
     });
     const res = {};
     porDespegue.forEach((items, id) => {
         let mejor = null;
-        MODELOS.forEach(m => {
+        modelosH.forEach(m => {
             const nota = calcularNotaGlobal(statsModelo(items, m, 'viento').mae, statsModelo(items, m, 'racha').mae, statsModelo(items, m, 'dir').mae);
             if (nota !== null && (mejor === null || nota > mejor.nota)) mejor = { modelo: m, nota };
         });
@@ -950,20 +969,22 @@ function alternarMapaGanador(activar) {
     const leyenda = document.getElementById('mapa-ganador-leyenda');
 
     if (activar && !capaPuntosGanador) {
-        const ganadores = ganadorPorDespegue();
+        const h = HORIZ_MAPA[+document.getElementById('rangoHorizonteMapa').value];
+        const hora = HORAS_MAPA[+document.getElementById('rangoHoraMapa').value];
+        const ganadores = ganadorPorDespegue(h, hora);
         const recuento = {};
         capaPuntosGanador = L.featureGroup();
         PUNTOS_MAPA.forEach(p => {
             const g = ganadores[p.id];
-            const color = g ? coloresModelo[g.modelo].replace('0.75', '1') : '#94a3b8'; // gris: sin datos a +1 día
+            const color = g ? coloresModelo[g.modelo].replace('0.75', '1') : '#94a3b8'; // gris: sin datos con ese filtro
             const clave = g ? g.modelo : 'sin';
             recuento[clave] = (recuento[clave] || 0) + 1;
             const punto = L.circleMarker([p.lat, p.lon], { radius: 6, color: '#ffffff', weight: 1, fillColor: color, fillOpacity: 1 });
-            punto.bindTooltip(g ? `${p.nombre}: ${g.modelo} (${g.nota.toFixed(1)})` : `${p.nombre}: no +1 day data`, { direction: 'top' });
+            punto.bindTooltip(g ? `${p.nombre}: ${g.modelo} (${g.nota.toFixed(1)})` : `${p.nombre}: no data`, { direction: 'top' });
             punto.on('click', () => window.open(p.link, '_blank', 'noopener,noreferrer'));
             capaPuntosGanador.addLayer(punto);
         });
-        const items = MODELOS.map(m => `<span><span class="punto" style="background:${coloresModelo[m].replace('0.75', '1')}"></span>${m} (${recuento[m] || 0})</span>`);
+        const items = (MODELOS_POR_HORIZ[h] || MODELOS).map(m => `<span><span class="punto" style="background:${coloresModelo[m].replace('0.75', '1')}"></span>${m} (${recuento[m] || 0})</span>`);
         if (recuento.sin) items.push(`<span><span class="punto" style="background:#94a3b8"></span>No data (${recuento.sin})</span>`);
         if (leyenda) leyenda.innerHTML = items.join('');
     }
@@ -976,6 +997,19 @@ function alternarMapaGanador(activar) {
         capaMarcadoresMapa.addTo(mapaDespegues);
     }
     if (leyenda) leyenda.style.display = activar ? 'flex' : 'none';
+    const controles = document.getElementById('mapa-ganador-controles');
+    if (controles) controles.style.display = activar ? 'flex' : 'none';
+}
+
+// 🗺️ Deslizadores de horizonte y hora de toma del mapa: actualizan el texto y repintan los puntos
+function cambiarFiltroMapaGanador() {
+    const h = HORIZ_MAPA[+document.getElementById('rangoHorizonteMapa').value];
+    const hora = HORAS_MAPA[+document.getElementById('rangoHoraMapa').value];
+    document.getElementById('txtHorizonteMapa').textContent = horizLabel(h);
+    document.getElementById('txtHoraMapa').textContent = hora === 'todas' ? 'All times' : `${String(hora).padStart(2, '0')}:00 h`;
+    if (!mapaDespegues) return;
+    if (capaPuntosGanador) { mapaDespegues.removeLayer(capaPuntosGanador); capaPuntosGanador = null; }
+    alternarMapaGanador(document.getElementById('chkMapaGanador').checked);
 }
 
 // Determines wind regime: Headwind (<=45°), Crosswind (46°-90°) or Tailwind (>90°)
