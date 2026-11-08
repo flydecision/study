@@ -651,12 +651,15 @@ async function cargarEstudio() {
         renderTablaHorizontes();
         renderComparativaEcmwf();
         cargarNubes(); // ☁️ independiente: si falta estudio_nubes.csv, la sección lo indica y el resto sigue
-        actualizarVistaDetalle();
 
+        // Se muestra ya el panel con las tablas principales y se deja que el navegador lo pinte;
+        // después se calcula la parte de exploración (gráficas, tabla por despegue y fórmulas), que es la más lenta.
         document.getElementById('loading').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
+        await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 
         renderMapaDespegues(PUNTOS_MAPA);
+        actualizarVistaDetalle();
     } catch (err) {
         console.error(err);
         // Si hay un error, lo muestra elegantemente dentro de la tarjeta con botón de reintento
@@ -795,9 +798,11 @@ function parseCSV(text) {
     const rawLines = raw.split(/\r?\n/);
     const logicalLines = [];
     let buffer = null;
+    // Nº de comillas de un texto sin crear arrays (antes: buffer.match(/"/g) en cada una de las 50.000+ líneas)
+    const numComillas = t => { let n = 0, i = -1; while ((i = t.indexOf('"', i + 1)) !== -1) n++; return n; };
     rawLines.forEach(l => {
         buffer = buffer === null ? l : buffer + '\n' + l;
-        if (((buffer.match(/"/g) || []).length) % 2 === 0) {
+        if (numComillas(buffer) % 2 === 0) {
             if (buffer.trim() !== '') logicalLines.push(buffer);
             buffer = null;
         }
@@ -1184,8 +1189,13 @@ const PARAMS = { viento: 'mediaErr', racha: 'rachaErr', dir: 'dirErr' };
 const PARAMS_BIAS = { viento: 'mediaBias', racha: 'rachaBias', dir: 'dirBias' };
 
 function media(arr) {
-    const v = arr.filter(x => x !== null && !isNaN(x));
-    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    // Un solo bucle, sin arrays intermedios (con 200.000+ muestras se nota)
+    let suma = 0, n = 0;
+    for (let i = 0; i < arr.length; i++) {
+        const x = arr[i];
+        if (x !== null && !isNaN(x)) { suma += x; n++; }
+    }
+    return n ? suma / n : null;
 }
 
 // Validación fuera de muestra: ajusta la recta con el ~70% de días más antiguos (por fecha de la
@@ -1195,8 +1205,9 @@ function validarFueraDeMuestra(list, modelo, paramKey) {
     const predKey = paramKey === 'viento' ? 'mediaPred' : 'rachaPred';
     const realKey = paramKey === 'viento' ? 'viento' : 'racha';
     const diaObs = it => {
+        if (it.diaObs !== undefined) return it.diaObs; // se calcula una vez por cruce y se reutiliza
         const d = it.real.date;
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return (it.diaObs = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
     };
     const ok = list.filter(it => {
         const p = it.modelos[modelo][predKey], r = it.real[realKey];
@@ -1223,24 +1234,17 @@ function calcRegresion(list, modelo, paramKey) {
     const predKey = paramKey === 'viento' ? 'mediaPred' : (paramKey === 'racha' ? 'rachaPred' : 'dirPred');
     const realKey = paramKey === 'viento' ? 'viento' : (paramKey === 'racha' ? 'racha' : 'dir');
     
-    const puntos = list.map(it => {
-        let pred;
-        if (paramKey === 'viento') pred = it.modelos[modelo].mediaPred;
-        else if (paramKey === 'racha') pred = it.modelos[modelo].rachaPred;
-        else pred = it.modelos[modelo].dirPred;
-        
-        const real = it.real[realKey];
-        return { x: pred, y: real };
-    }).filter(p => p.x !== null && !isNaN(p.x) && p.y !== null && !isNaN(p.y));
+    // Un solo recorrido acumulando las sumas (antes: map + filter + 5 reduce)
+    let n = 0, sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    for (let i = 0; i < list.length; i++) {
+        const it = list[i];
+        const x = it.modelos[modelo][predKey];
+        const y = it.real[realKey];
+        if (x === null || isNaN(x) || y === null || isNaN(y)) continue;
+        n++; sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x; sumY2 += y * y;
+    }
 
-    if (puntos.length < 5) return { m: 1, b: 0, r2: 0, n: puntos.length };// Necesitamos al menos 5 muestras
-
-    const n = puntos.length;
-    const sumX = puntos.reduce((s, p) => s + p.x, 0);
-    const sumY = puntos.reduce((s, p) => s + p.y, 0);
-    const sumXY = puntos.reduce((s, p) => s + p.x * p.y, 0);
-    const sumX2 = puntos.reduce((s, p) => s + p.x * p.x, 0);
-    const sumY2 = puntos.reduce((s, p) => s + p.y * p.y, 0);
+    if (n < 5) return { m: 1, b: 0, r2: 0, n: n };// Necesitamos al menos 5 muestras
 
     const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
     const b = (sumY - m * sumX) / n;
@@ -1255,16 +1259,34 @@ function calcRegresion(list, modelo, paramKey) {
 
 function statsModelo(list, modelo, paramKey) {
     const errKey = PARAMS[paramKey], biasKey = PARAMS_BIAS[paramKey];
-    const errs = list.map(it => it.modelos[modelo][errKey]);
-    const biases = list.map(it => it.modelos[modelo][biasKey]);
-    const validErrs = errs.filter(v => v !== null && !isNaN(v));
-    const rmse = validErrs.length > 0 ? Math.sqrt(validErrs.reduce((s, v) => s + v * v, 0) / validErrs.length) : null;
-    return { mae: media(errs), bias: media(biases), rmse: rmse, n: validErrs.length };
+    // Un solo recorrido de la lista (antes: 2 map + filter + 3 reduce por llamada)
+    let sumErr = 0, sumErr2 = 0, nErr = 0, sumBias = 0, nBias = 0;
+    for (let i = 0; i < list.length; i++) {
+        const mo = list[i].modelos[modelo];
+        const e = mo[errKey], b = mo[biasKey];
+        if (e !== null && !isNaN(e)) { sumErr += e; sumErr2 += e * e; nErr++; }
+        if (b !== null && !isNaN(b)) { sumBias += b; nBias++; }
+    }
+    return {
+        mae: nErr ? sumErr / nErr : null,
+        bias: nBias ? sumBias / nBias : null,
+        rmse: nErr ? Math.sqrt(sumErr2 / nErr) : null,
+        n: nErr
+    };
 }
 
+// Caché de soloComunes: el mismo filtro (misma lista, horizonte y parámetro) se pedía varias veces
+// (resumen global, tabla por horizonte...). CRUCES se crea de nuevo en cada carga, así que no se queda viejo.
+const _cacheComunes = new WeakMap();
 function soloComunes(list, h, paramKey) {
+    let porLista = _cacheComunes.get(list);
+    if (!porLista) { porLista = new Map(); _cacheComunes.set(list, porLista); }
+    const clave = h + '|' + paramKey;
+    if (porLista.has(clave)) return porLista.get(clave);
     const ms = MODELOS_POR_HORIZ[h] || MODELOS, k = PARAMS[paramKey];
-    return list.filter(it => ms.every(m => it.modelos[m][k] !== null && !isNaN(it.modelos[m][k])));
+    const res = list.filter(it => ms.every(m => it.modelos[m][k] !== null && !isNaN(it.modelos[m][k])));
+    porLista.set(clave, res);
+    return res;
 }
 
 function fmtDir(mae, bias, prefix = '', rmse = null, n = null) {
@@ -1337,7 +1359,7 @@ function renderResumenGlobal() {
 
     horizKeys.forEach(h => {
         paramKeys.forEach(p => {
-            const rk = MODELOS.map(m => ({ modelo: m, ...statsModelo(soloComunes(CRUCES[h], h, p), m, p) }))
+            const rk = (MODELOS_POR_HORIZ[h] || MODELOS).map(m => ({ modelo: m, ...statsModelo(soloComunes(CRUCES[h], h, p), m, p) }))
                 .filter(s => s.mae !== null)
                 .sort((a, b) => a.mae - b.mae);
             if (rk.length < 2) return; // sin competición no hay posición que puntuar
@@ -1461,13 +1483,13 @@ function renderTablaHorizontes() {
             stats[m] = { v, r, d, score };
         });
 
-        const minMedia = Math.min(...MODELOS.map(m => stats[m].v.mae).filter(v => v !== null));
-        const minRacha = Math.min(...MODELOS.map(m => stats[m].r.mae).filter(v => v !== null));
-        const minDir   = Math.min(...MODELOS.map(m => stats[m].d.mae).filter(v => v !== null));
-
-        const maxScore = Math.max(...MODELOS.map(m => stats[m].score).filter(v => v !== null));
-
         const modelosHorizonte = MODELOS_POR_HORIZ[h] || MODELOS;
+
+        const minMedia = Math.min(...modelosHorizonte.map(m => stats[m].v.mae).filter(v => v !== null));
+        const minRacha = Math.min(...modelosHorizonte.map(m => stats[m].r.mae).filter(v => v !== null));
+        const minDir   = Math.min(...modelosHorizonte.map(m => stats[m].d.mae).filter(v => v !== null));
+
+        const maxScore = Math.max(...modelosHorizonte.map(m => stats[m].score).filter(v => v !== null));
         // Con un solo modelo en el horizonte no hay competición: no se marca ganador
         const hayCompeticion = modelosHorizonte.length >= 2;
         const isWinner = (val, minVal) => hayCompeticion && val !== null && minVal !== null && val === minVal;
@@ -1744,9 +1766,12 @@ function renderFormulaCorreccion(lugarSel) {
     // Desglose horario: solo diagnostico visual (la reduccion de error al partir por hora
     // es debil, 0.2%-2.5% segun horizonte), no se usa para generar una formula distinta.
     function desglosePorHora(lista, modelo, paramKey) {
-        const horas = [...new Set(lista.map(it => it.hora).filter(h => h !== null))].sort((a, b) => a - b);
+        // Agrupamos por hora UNA sola vez (antes se re-filtraba la lista entera por cada hora)
+        const porHora = new Map();
+        lista.forEach(it => { if (it.hora === null) return; if (!porHora.has(it.hora)) porHora.set(it.hora, []); porHora.get(it.hora).push(it); });
+        const horas = [...porHora.keys()].sort((a, b) => a - b);
         return horas.map(h => {
-            const r = calcRegresion(lista.filter(it => it.hora === h), modelo, paramKey);
+            const r = calcRegresion(porHora.get(h), modelo, paramKey);
             return `${h}h: n=${r.n}${r.n >= 10 ? ` (R²=${(r.r2 * 100).toFixed(0)}%)` : ''}`;
         }).join(' &nbsp; ');
     }
